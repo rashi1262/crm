@@ -49,6 +49,7 @@ interface ActionDetails {
   teamName?: string[]; // ✅ Now an array of strings
   markAsSend?: boolean;
   followUpDate?: string;
+  lastfollowUpDate?:string;
 }
 
 interface ProjectActionDetails {
@@ -67,7 +68,7 @@ interface ProjectProfile {
   description: string;
   clientBudget: number;
   status: string;
-  jd?: string;
+  projectDescription?: string;
   proposalDescription: string;
 
   actionDetails?: ActionDetails;

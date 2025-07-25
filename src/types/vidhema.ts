@@ -26,24 +26,6 @@ export interface VidhemaRawBlog {
     __v?: number;
 }
 
-
 // --- CHANGE THIS INTERFACE ---
 // It should be a direct array of VidhemaRawBlog, as per the actual API response
-// export type VidhemaApiResponse = VidhemaRawBlog[];
-
-export interface VidhemaApiResponse {
-    success: boolean;
-    message?: string;
-    data: VidhemaRawBlog[];
-    // pagination?: {
-    //   currentPage: number;
-    //   totalPages: number;
-    //   totalItems: number;
-    //   limit: number;
-    // };
-
-    // new
-    totalBlogs: number;
-  totalPages: number;
-  currentPage: number;
-  }
+export type VidhemaApiResponse = VidhemaRawBlog[];

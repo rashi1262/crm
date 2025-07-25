@@ -5,12 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BlogPost } from '../types'; // Common BlogPost from index.ts
 import { VidhemaRawBlog, VidhemaApiResponse } from '../types/vidhema'; // Vidhema specific types
 import { SolarStationRawBlog, SolarStationApiResponse } from '../types/solarstation'; // SolarStation specific types
-import { ConvexaiRawBlog } from '../types/convexai'; // <--- CORRECTED IMPORT
-import { fetchConvexaiBlogs } from '@/api/convexaiApi'; // <--- ADD OR UNCOMMENT THIS LINE
-import { FirmsfinderRawBlog, FirmsfinderBlogsApiResponse } from '../types/firmsfinder'; // NEW: Firmsfinder types
-import { fetchFirmsfinderBlogs } from '@/api/firmsfinderApi'; // <--- ADD THIS LINE
-
-
+import { fetchConvexaiBlogs } from '@/api/convexaiApi'; // <--- ADD THIS LINE
 
 
 // Import ShadCN UI Components
@@ -106,8 +101,7 @@ export default function BlogList(): JSX.Element {
     { value: 'all', label: 'All Blogs' }, // ADDED: 'All Blogs' option
     { value: 'solarstation.in', label: 'solarstation.in' },
     { value: 'vidhema.com', label: 'vidhema.com' },
-    { value: 'convexai.io', label: 'convexai.io' },
-    { value: 'firmsfinder.co', label: 'firmsfinder.co' }, 
+    { value: 'convexai.io', label: 'convexai.io' }, // ADDED: ConvexAI option
   ];
 
   // IMPORTANT: For production, this token should be fetched securely (e.g., after login)
@@ -131,7 +125,7 @@ export default function BlogList(): JSX.Element {
       backgroundImage: '',
       date: rawBlog.date,
       author: 'SolarStation Team',
-      category: Array.isArray(rawBlog.blogcategory) && rawBlog.blogcategory.length > 0 ? rawBlog.blogcategory : ['Uncategorized'],
+      category: 'General',
       tags: Array.isArray(rawBlog.tags) ? rawBlog.tags : [],
       isFeatured: rawBlog.isFeatured ? 'Yes' : 'No',
       website: 'solarstation.in',
@@ -160,6 +154,7 @@ export default function BlogList(): JSX.Element {
       backgroundImage: rawBlog.background_image || '',
       date: rawBlog.date,
       author: rawBlog.select_author || 'Unknown Author',
+      category: rawBlog.select_category || 'Uncategorized',
       tags: Array.isArray(rawBlog.meta_titlemetatags) ? rawBlog.meta_titlemetatags : [],
       isFeatured: rawBlog.is_featured ? 'Yes' : 'No',
       website: 'vidhema.com',
@@ -178,73 +173,6 @@ export default function BlogList(): JSX.Element {
     };
   };
 
-
-  const transformConvexaiBlog = (rawBlog: ConvexaiRawBlog): BlogPost => {
-    return {
-      id: rawBlog._id,
-      title: rawBlog.title,
-      slug: rawBlog.title.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-'),
-      briefDescription: rawBlog.description.substring(0, 150) + '...',
-      description: rawBlog.description,
-      technology: 'AI/ML',
-      featuredImage: rawBlog.image || '',
-      backgroundImage: rawBlog.image || '',
-      date: rawBlog.date,
-      author: rawBlog.author,
-      category: rawBlog.categoryId ? [rawBlog.categoryId] : ['Uncategorized'],
-      tags: Array.isArray(rawBlog.metaKeywords) ? rawBlog.metaKeywords : [], // Use metaKeywords as tags, ensure array type
-      isFeatured: 'No',
-      website: 'convexai.io',
-      // FIX: Ensure 'keywords' is always a string.
-      // This will map rawBlog.metaKeywords (which is string[] | undefined) to a string for BlogPost.keywords.
-      keywords: Array.isArray(rawBlog.metaKeywords) ? rawBlog.metaKeywords.join(', ') : '', 
-      
-      metaTitle: rawBlog.metaTitle || rawBlog.title,
-      metaDescription: rawBlog.metaDescription || rawBlog.description.substring(0, 160) + '...',
-      metaKeywords: Array.isArray(rawBlog.metaKeywords) ? rawBlog.metaKeywords.join(', ') : '', // This is for metaKeywords property
-      metaImageurl: rawBlog.image || '',
-      metaImagealt: rawBlog.title,
-      metaImagetitle: rawBlog.title,
-
-      url: `/blog/${rawBlog.title.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')}`,
-      faq: [],
-    };
-  };
-
-  const transformFirmsfinderBlog = (rawBlog: FirmsfinderRawBlog): BlogPost => {
-    // console.log("--- Inside transformFirmsfinderBlog ---"); // Keep for debugging
-    // console.log("Raw Blog Received:", rawBlog); // Keep for debugging
-
-    return {
-      id: rawBlog._id,
-      title: rawBlog.name, // Map 'name' to 'title'
-      slug: rawBlog.name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-'),
-      briefDescription: rawBlog.description.substring(0, 150) + '...',
-      description: rawBlog.description,
-      featuredImage: rawBlog.image || '',
-      backgroundImage: rawBlog.image || '',
-      date: rawBlog.createdAt || new Date().toISOString(),
-      author: rawBlog.user?.name || 'Unknown User', // <--- FIX: Access 'name' from 'user' object (using optional chaining)
-      category: Array.isArray(rawBlog.category) && rawBlog.category.length > 0
-                  ? rawBlog.category.map(catObj => catObj.name) // <--- FIX: Map array of category objects to array of category names
-                  : ['Uncategorized'],
-      tags: rawBlog.tags ? rawBlog.tags.split(',').map(tag => tag.trim()) : [],
-      isFeatured: 'No',
-      website: 'firmsfinder.co',
-      keywords: rawBlog.tags ? rawBlog.tags.split(',').map(tag => tag.trim()).join(',') : '', // Use raw tags as keywords string
-
-      metaTitle: rawBlog.name || '',
-      metaDescription: rawBlog.description.substring(0, 160) + '...',
-      metaKeywords: rawBlog.tags ? rawBlog.tags.split(',').map(tag => tag.trim()).join(',') : '',
-      metaImageurl: rawBlog.image || '',
-      metaImagealt: rawBlog.name || '',
-      metaImagetitle: rawBlog.name || '',
-
-      url: `/blog/${rawBlog.name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')}`,
-      faq: [],
-      readTime: rawBlog.readTime || '',
-    };
-  };
   
   // new ---Api fetching logic without useCallback so that easily call the function on the fitler change etc.
   const fetchBlogs=async()=>{
@@ -264,8 +192,6 @@ export default function BlogList(): JSX.Element {
            order: { createdAt: -1 },
            skip: (currentPage - 1) * currentLimit,
            limit: currentLimit,
-           t: Date.now().toString(), // 👈 cache buster
-
          };
          if (searchTerm) {
            vidhemaFilterObj.where = { title: { like: `.*${searchTerm}.*`, options: 'i' } };
@@ -273,8 +199,7 @@ export default function BlogList(): JSX.Element {
  
          const encodedFilter = encodeURIComponent(JSON.stringify(vidhemaFilterObj));
          const url = `https://api.vidhema.com/blogs?filter=${encodedFilter}`;
-         console.log("📡 Vidhema API URL:", url); 
-
+ 
          const response = await fetch(url, {
            headers: {
              'access_token': vidhemaAccessToken,
@@ -294,9 +219,6 @@ export default function BlogList(): JSX.Element {
            throw new Error("Vidhema API response is not a valid array of blogs.");
          }  
          transformedBlogs = rawVidhemaBlogs.map(transformVidhemaBlog);
-         console.log('this is full solsttion pi respos',response)
-         //console.log(`📄 Blog titles on page ${currentPage}:`, response.data.map(blog => blog.title));
- 
          
 
          if (rawVidhemaBlogs.length < currentLimit) {
@@ -309,22 +231,18 @@ export default function BlogList(): JSX.Element {
          }
  
  
-       } 
-       
-       else if (websiteFilter === 'solarstation.in') { // Changed 'else' to 'else if' for clarity
+       } else if (websiteFilter === 'solarstation.in') { // Changed 'else' to 'else if' for clarity
          // Existing SolarStation logic
          const solarstationUrlParams = new URLSearchParams({
            page: currentPage.toString(),
            limit: currentLimit.toString(),
-           t: Date.now().toString(), // 👈 cache buster
- 
          });
          if (searchTerm) {
            solarstationUrlParams.append('search', searchTerm);
          }
  
          const url = `https://api.solarstation.in/blogs/getAllBlogs?${solarstationUrlParams.toString()}`;
-         console.log("📡 SolarStation API URL:", url); 
+ 
          const response = await fetch(url);
          if (!response.ok) {
            const errorData = await response.json();
@@ -337,15 +255,13 @@ export default function BlogList(): JSX.Element {
          }
  
          transformedBlogs = apiResponse.data.map(transformSolarStationBlog);
-         console.log('this is full solsttion pi respos',apiResponse)
-         console.log(`📄 Blog titles on page ${currentPage}:`, apiResponse.data.map(blog => blog.title));
  
-         
-        if (typeof apiResponse.totalPages === 'number') {
-          totalPagesFromApi = apiResponse.totalPages;
-          console.log("✅ totalPages from API:", totalPagesFromApi);
-        }
-         else {
+         // --- START OF ROBUST LOGIC FOR SOLARSTATION.IN ---
+         // Prioritize API's pagination data if available and valid
+         if (apiResponse.pagination && typeof apiResponse.pagination.totalPages === 'number') {
+             totalPagesFromApi = apiResponse.pagination.totalPages;
+             console.log("SolarStation API Pagination Response (from object):", apiResponse.pagination); // Log API's pagination
+         } else {
              // Client-side heuristic if API doesn't provide totalPages or if the object is missing/malformed
              if (transformedBlogs.length === currentLimit) {
                  totalPagesFromApi = currentPage + 1;
@@ -362,11 +278,8 @@ export default function BlogList(): JSX.Element {
          console.log("SolarStation API Raw Response Data Length:", apiResponse.data.length);
  
          console.log("SolarStation API Raw Response Data Length:", apiResponse.data);
-         console.log("SolarStation API Raw Response Data Length:", apiResponse.data);
  
-       } 
-       
-else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
+       } else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
          console.log("Fetching blogs from ConvexAI...");
          // fetchConvexaiBlogs is assumed to return already transformed BlogPost[] and fetch all available blogs
          let allConvexaiBlogs = await fetchConvexaiBlogs(); 
@@ -378,7 +291,7 @@ else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
                  (blog.briefDescription && blog.briefDescription.toLowerCase().includes(searchTerm.toLowerCase())) ||
                  (blog.description && blog.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
                  blog.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                 (Array.isArray(blog.category) && blog.category.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+                 blog.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
                  (Array.isArray(blog.tags) && blog.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
              );
          }
@@ -393,21 +306,37 @@ else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
 
          console.log("ConvexAI blogs fetched and paginated:", transformedBlogs);
 
-         
+       } else if (websiteFilter === 'all') { // NEW: Logic for 'all' blogs
+         console.log("Fetching all blogs from all sources...");
+         // Fetch all blogs from each source to enable client-side search/pagination
+         const [solarBlogsAll, vidhemaBlogsAll, convexaiBlogsAll] = await Promise.all([
+           fetchSolarStationBlogs(1, 100000, '', transformSolarStationBlog), // Fetch all (high limit)
+           fetchVidhemaBlogs(1, 100000, '', vidhemaAccessToken, transformVidhemaBlog), // Fetch all (high limit)
+           fetchConvexaiBlogs(), // Assuming this already fetches all ConvexAI blogs
+         ]);
 
-       } else if (websiteFilter === 'firmsfinder.co') { // NEW: Logic for Firmsfinder.co blogs
-        console.log("Fetching blogs from Firmsfinder.co...");
-        // fetchFirmsfinderBlogs returns { blogs: FirmsfinderRawBlog[], totalBlogs: number }
-        const firmsfinderResponse = await fetchFirmsfinderBlogs(currentPage, currentLimit, searchTerm);
-        
-        transformedBlogs = firmsfinderResponse.blogs; // <--- CORRECTED: Already transformed
-        totalPagesFromApi = Math.ceil(firmsfinderResponse.totalBlogs / currentLimit) || 1;
-      
-        console.log("Firmsfinder blogs fetched and paginated:", transformedBlogs);
-        console.log("Firmsfinder Total Blogs from API:", firmsfinderResponse.totalBlogs);
-      
-      }
-       
+         let combinedBlogs = [...solarBlogsAll, ...vidhemaBlogsAll, ...convexaiBlogsAll];
+
+         // Apply client-side search filter for combined blogs
+         if (searchTerm) {
+             combinedBlogs = combinedBlogs.filter(blog =>
+                 blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                 (blog.briefDescription && blog.briefDescription.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                 (blog.description && blog.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                 blog.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                 blog.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                 (Array.isArray(blog.tags) && blog.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
+             );
+         }
+
+         totalItemsCount = combinedBlogs.length;
+         totalPagesFromApi = Math.ceil(totalItemsCount / currentLimit) || 1;
+
+         // Apply client-side pagination
+         const startIndex = (currentPage - 1) * currentLimit;
+         const endIndex = startIndex + currentLimit;
+         transformedBlogs = combinedBlogs.slice(startIndex, endIndex);
+       }
  
        setBlogs(transformedBlogs);
        setTotalPages(totalPagesFromApi);
@@ -434,7 +363,6 @@ else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
        setLoading(false);
      }
   }
-
     // currentLimit is now a constant, no need to include in dependency array.
     useEffect(() => {
       console.log("[useEffect] current page change to:", currentPage)
@@ -522,10 +450,62 @@ else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
       return;
     }
 
-    // FIX: Navigate to the DeleteBlogPage instead of performing direct deletion
-    // The actual confirmation and API call will happen in DeleteBlogPage and its child component.
-     navigate(`/blog/delete/${blogToDelete.website}/${blogToDelete.id}`); 
-};
+    if (window.confirm(`Are you sure you want to delete "${blogToDelete.title}"? This blog is from ${blogToDelete.website}.`)) {
+      try {
+        let response;
+        if (blogToDelete.website === 'solarstation.in') {
+          response = await fetch(`https://api.solarstation.in/blogs/deleteBlog/${id}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } else if (blogToDelete.website === 'vidhema.com') {
+          response = await fetch(`https://api.vidhema.com/blogs/${id}?access_token=${vidhemaAccessToken}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } else if (blogToDelete.website === 'convexai.io') { // NEW: Handle ConvexAI deletion
+          toast({
+            title: "Deletion Not Supported Yet",
+            description: `Deletion of blogs from ConvexAI is not currently supported via this interface.`,
+            variant: "destructive",
+            duration: 3000,
+          });
+          return; // Exit as deletion is not performed
+        } else {
+          toast({
+            title: "Deletion Not Supported",
+            description: `Deletion of blogs from ${blogToDelete.website} is not currently supported.`,
+            variant: "destructive",
+            duration: 3000,
+          });
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `API Error: ${response.status} ${response.statusText}`);
+        }
+
+        toast({
+          title: "Blog Deleted",
+          description: `Blog "${blogToDelete.title}" deleted successfully.`,
+          variant: "default",
+          duration: 1500,
+        });
+
+        await fetchBlogs(); // Refetch to update the list after deletion
+
+      } catch (deleteError: any) {
+        console.error("Error deleting blog:", deleteError);
+        toast({
+          title: "Deletion Error",
+          description: `Failed to delete blog: ${deleteError.message}`,
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    }
+  };
 
   const openViewModal = (blog: BlogPost) => {
     setSelectedBlog(blog);
@@ -586,6 +566,11 @@ else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
               className="
                 bg-gradient-to-r from-blue-600 to-purple-600
                 hover:from-blue-700 hover:to-purple-700
+                text-white font-semibold
+                px-5 py-2 rounded-md
+                shadow-md hover:shadow-lg
+                transition-all duration-200
+                flex items-center gap-1
                 w-full justify-center md:w-auto
               "
             >
@@ -669,19 +654,18 @@ else if (websiteFilter === 'convexai.io') { // NEW: Logic for ConvexAI blogs
                     <Eye className="h-4 w-4" />
                   </Button>
                   {/* Edit button: Only enable if it's from a known editable source (e.g., solarstation.in) */}
-                  {(blog.website === 'solarstation.in' || blog.website === 'firmsfinder.co') && blog.slug && blog.id && ( // Add firmsfinder.co
+                  {blog.website === 'solarstation.in' && blog.slug && (
                     <Button
                       size="icon"
                       variant="outline"
                       className="border-green-200 text-green-700 hover:bg-green-50"
-                      // Navigate to the new dynamic route: /blog/edit/:website/:id
-                      onClick={() => navigate(`/blog/edit/${blog.website}/${blog.id}`)} // Use blog.id for Firmsfinder
+                      onClick={() => navigate(`/blog/edit/${blog.slug}`)}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
                   {/* Delete button: Only enable if delete is supported for this source */}
-                  {(blog.website === 'solarstation.in' || blog.website === 'vidhema.com' || blog.website === 'convexai.io' || blog.website === 'firmsfinder.co') && blog.id && (
+                  {(blog.website === 'solarstation.in' || blog.website === 'vidhema.com' || blog.website === 'convexai.io') && blog.id && ( // ADDED: ConvexAI to deletion condition
                     <Button
                       size="icon"
                       variant="outline"

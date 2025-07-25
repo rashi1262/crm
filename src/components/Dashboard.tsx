@@ -184,6 +184,13 @@ export const Dashboard = () => {
     name: string;
   }
 
+  // chatting
+type ChatMessage = {
+  id: number;
+  message: string;
+  timestamp: string;
+};
+
   // Main JobProfile interface
   interface JobProfile {
     _id: string;
@@ -199,6 +206,9 @@ export const Dashboard = () => {
     actionDetails?: ActionDetails;
     interviewActionDetails?: InterviewActionDetails;
     // sentProfiles?: SentProfile[];
+     followups?: Followup[];
+  chatMessages?: ChatMessage[]; // ✅ Add this
+  conversations?: number; // ✅ Add this
 
     createdAt: string;
     updatedAt: string;
@@ -227,7 +237,7 @@ export const Dashboard = () => {
     description: string;
     clientBudget: number;
     status: string;
-    jd?: string;
+    projectDescription?: string;
     proposalDescription: string;
 
     actionDetails?: ActionDetails;
@@ -294,31 +304,62 @@ export const Dashboard = () => {
 
   // top job value on the based on followups based
 
-  const getTopFollowupDateForJob = (job: any): string | null => {
-    const now = Date.now();
+  // const getTopFollowupDateForJob = (job: any): string | null => {
+  //   const now = Date.now();
 
-    // Step 1: Check future followups in the array
-    const futureFollowups = (job.followups || [])
-      .filter((f: any) => !f.completed && new Date(f.datetime).getTime() > now)
-      .sort(
-        (a: any, b: any) =>
-          new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
-      );
+  //   // Step 1: Check future followups in the array
+  //   const futureFollowups = (job.followups || [])
+  //     .filter((f: any) => !f.completed && new Date(f.datetime).getTime() > now)
+  //     .sort(
+  //       (a: any, b: any) =>
+  //         new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+  //     );
 
-    if (futureFollowups.length > 0) {
-      return futureFollowups[0].datetime;
-    }
+  //   if (futureFollowups.length > 0) {
+  //     return futureFollowups[0].datetime;
+  //   }
 
-    // Step 2: Fallback to actionDetails followUpDate
-    if (
-      job.actionDetails?.followUpDate &&
-      new Date(job.actionDetails.followUpDate).getTime() > now
-    ) {
-      return job.actionDetails.followUpDate;
-    }
+  //   // Step 2: Fallback to actionDetails followUpDate
+  //   if (
+  //     job.actionDetails?.followUpDate &&
+  //     new Date(job.actionDetails.followUpDate).getTime() > now
+  //   ) {
+  //     return job.actionDetails.followUpDate;
+  //   }
 
-    return null;
-  };
+  //   return null;
+  // };
+
+  // new 
+  const getTopFollowupDateForJob = (job: JobProfile): string | null => {
+  const now = Date.now();
+  const candidates: number[] = [];
+
+  // 1. Collect future followups from followups[]
+  if (Array.isArray(job.followups)) {
+    job.followups.forEach((fu) => {
+      const time = new Date(fu.datetime).getTime();
+      if (!fu.completed && time > now) {
+        candidates.push(time);
+      }
+    });
+  }
+
+  // 2. Add actionDetails.followUpDate if in future
+  const actionFollowupTime = job.actionDetails?.followUpDate
+    ? new Date(job.actionDetails.followUpDate).getTime()
+    : null;
+
+  if (actionFollowupTime && actionFollowupTime > now) {
+    candidates.push(actionFollowupTime);
+  }
+
+  // 3. Return earliest one, or null
+  if (candidates.length === 0) return null;
+
+  const soonest = Math.min(...candidates);
+  return new Date(soonest).toISOString(); // standardized format
+};
 
   const getJobsData = async () => {
     try {
@@ -364,16 +405,30 @@ export const Dashboard = () => {
       // Filter jobs with upcoming followups
       // And prepare an array of { job, followupDate } objects
       // Find upcoming followups
-      const futureFollowups = AllJobsData.filter(
-        (job) => job.actionDetails?.followUpDate
-      )
-        .map((job) => {
-          const followupTime = new Date(
-            job.actionDetails.followUpDate
-          ).getTime();
-          return { job, followupTime };
-        })
-        .filter((item) => item.followupTime > now);
+      // const futureFollowups = AllJobsData.filter(
+      //   (job) => job.actionDetails?.followUpDate
+      // )
+      //   .map((job) => {
+      //     const followupTime = new Date(
+      //       job.actionDetails.followUpDate
+      //     ).getTime();
+      //     return { job, followupTime };
+      //   })
+      //   .filter((item) => item.followupTime > now);
+
+      // new 
+      const futureFollowups = AllJobsData.map((job) => {
+  const followupDate = getTopFollowupDateForJob(job);
+  const followupTime = followupDate ? new Date(followupDate).getTime() : null;
+
+  return followupTime && followupTime > now
+    ? { job, followupTime }
+    : null;
+}).filter(
+  (item): item is { job: JobProfile; followupTime: number } =>
+    item !== null
+);
+
 
       console.log("🟢 Future Job Followups:", futureFollowups);
 
@@ -421,7 +476,7 @@ export const Dashboard = () => {
       setTotalClients(response.data.length);
       // ✅ Get the actual list of partial payment clients
       const partialPayments = response.data.filter(
-        (client: Client) => client.paymentStatus === "Partial"
+        (client: Client) => client.paymentStatus === "Partial" || client.paymentStatus === "Pending"
       );
 
       // ✅ Set count for stats
@@ -840,10 +895,10 @@ console.log(result); // expected: "18 Jul 2025, 12:10 PM" (if IST)
                     {partialPayementStatus ||0}
                   </div>
                 )}
-                <div className="flex items-center text-xs text-green-600">
+                {/* <div className="flex items-center text-xs text-green-600">
                   <TrendingUp className="h-3 w-3 mr-1" />
                   +12% from last month
-                </div>
+                </div> */}
               </CardContent>
             </Card>
           );
@@ -954,7 +1009,7 @@ console.log(result); // expected: "18 Jul 2025, 12:10 PM" (if IST)
                             {activity.type}
                           </p>
                           <p className="text-sm text-gray-600 truncate">
-                            {` Follow -Up scheduled with Client${
+                            {` Follow-Up scheduled of  ${
                               nextFollowupClient?.company ||
                               "No One "
                             } `}
@@ -975,7 +1030,7 @@ console.log(result); // expected: "18 Jul 2025, 12:10 PM" (if IST)
                             {activity.type}
                           </p>
                           <p className="text-sm text-gray-600 truncate">
-                            {` Follow -Up scheduled with Client${
+                            {` Follow-Up scheduled of ${
                               nextFollowupProjects?.title ||
                              "No One"
                             } `}
@@ -995,7 +1050,7 @@ console.log(result); // expected: "18 Jul 2025, 12:10 PM" (if IST)
                             {activity.type}
                           </p>
                           <p className="text-sm text-gray-600 truncate">
-                            {`Follow-up scheduled with Job ${
+                            {`Follow-Up scheduled Of  ${
                               nextFollowupJobs?.title || "No One"
                             }  ` }
                           </p>
@@ -1145,9 +1200,12 @@ console.log(result); // expected: "18 Jul 2025, 12:10 PM" (if IST)
                       <p className="font-semibold text-gray-900">
                         {job.title || "Job Title"}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      {/* <p className="text-sm text-gray-600">
                         {formatFollowupDate(job.actionDetails.followUpDate)}
-                      </p>
+                      </p> */}
+                      <p className="text-sm text-gray-600">
+  {formatFollowupDate(new Date(followup).toISOString())}
+</p>
                     </div>
                     {/* same followup and high nhi dikh */}
                     {/* <div className="flex items-center gap-2">

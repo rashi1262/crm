@@ -17,6 +17,7 @@ import { Analytics } from "./components/Analytics";
 import { Dashboard } from "./components/Dashboard";
 import { ProjectLeads } from "./components/ProjectLeads";
 import { ProjectLeadForm } from "./components/ProjectLeadForm";
+import {AllFollowUps} from "./components/AllFollowUps";
 
 import BlogList from './components/BlogList';
 
@@ -66,6 +67,8 @@ const App = () => {
               <Route path="/" element={<Index />}>
                 {/* Default protected route, redirects to dashboard */}
                 <Route index element={<Navigate to="/dashboard" replace />} />
+                {/* new All followup filter */}
+               <Route path="allfollowup" element={<AllFollowUps />} />
 
                 {/* Existing Protected Routes */}
                 <Route path="dashboard" element={<Dashboard />} />

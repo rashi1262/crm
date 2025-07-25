@@ -32,6 +32,7 @@ interface ActionDetails {
   candidateName?: string | null;
   markAsSend?: boolean;
   followUpDate?: string;
+  lastfollowUpDate?:string;
 }
 
 interface InterviewActionDetails {

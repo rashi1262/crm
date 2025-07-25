@@ -272,9 +272,29 @@ export const ClientList = ({
   // followup ka update
   const updateClientFollowUp = async (id: string, updates: Partial<Client>) => {
     try {
+      // const updatePayload = {
+      //   ...updates,
+      // };
+
+      const clientResponse = await axios.get(`${baseURL}/clients/${id}`);
+      const serverFollowups = clientResponse.data.followups || [];
+      // ✅ Sort followups by date DESC (newest first)
+      const sortedFollowups = [...serverFollowups].sort(
+        (a, b) =>
+          new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+      );
+
+      // ✅ Extract next and last followup
+      const nextFollowup = sortedFollowups[0]?.datetime || null;
+      const lastFollowup =
+        sortedFollowups[1]?.datetime || sortedFollowups[0]?.datetime || null;
+
       const updatePayload = {
         ...updates,
+        lastFollowup,
+        nextFollowup,
       };
+
       console.log("Updating client with ID:", id);
       console.log("this is the updateclient data", updatePayload);
       const result = await axios.patch(
@@ -306,33 +326,46 @@ export const ClientList = ({
   };
 
   const validateFollowUpData = (): boolean => {
-  if (!followupData.description.trim()) {
-    toast({
-      variant: "destructive",
-      title: "❌ Validation Error",
-      description: "Follow-up description cannot be empty.",
-    });
-    return false;
-  }
+    if (!followupData.description.trim()) {
+      toast({
+        variant: "destructive",
+        title: "❌ Validation Error",
+        description: "Follow-up description cannot be empty.",
+      });
+      return false;
+    }
 
-  if (!followupData.datetime) {
-    toast({
-      variant: "destructive",
-      title: "❌ Validation Error",
-      description: "Please select a valid follow-up date and time.",
-    });
-    return false;
-  }
+    if (!followupData.datetime) {
+      toast({
+        variant: "destructive",
+        title: "❌ Validation Error",
+        description: "Please select a valid follow-up date and time.",
+      });
+      return false;
+    }
 
-  return true;
-};
+    const selectedDate = new Date(followupData.datetime);
+    const now = new Date();
+
+    // Validate: Meeting date should not be in the past
+    if (selectedDate.getTime() <= now.getTime()) {
+      toast({
+        title: "Invalid Date/Time",
+        description: "Follow Up time cannot be in the past.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    return true;
+  };
 
   const addFollowup = (e, clientId: string) => {
     e.preventDefault();
     const client = clients.find((c) => c.id === clientId);
-      if (!client) return;
+    if (!client) return;
 
-  if (!validateFollowUpData()) return; // 🔐 Stop if validation fails
+    if (!validateFollowUpData()) return; // 🔐 Stop if validation fails
     if (client && followupData.description && followupData.datetime) {
       const newFollowup = {
         id: Date.now(),
@@ -413,7 +446,6 @@ export const ClientList = ({
     }
   };
 
-
   // Payement ka update
   const updateClientPayement = async (id: string, updates: Partial<Client>) => {
     try {
@@ -462,7 +494,7 @@ export const ClientList = ({
     //   totalAmount: paymentData.totalAmount,
     //   paidAmount: paymentData.paidAmount,
     // });
-     updateClientPayement(clientId, {
+    updateClientPayement(clientId, {
       // paymentStatus: paymentData.status,
       paymentStatus: newStatus,
       totalAmount: paymentData.totalAmount,
@@ -919,16 +951,21 @@ export const ClientList = ({
                       ) : (
                         <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                           {client.followups && client.followups.length > 0 ? (
-                            client.followups.map((fu, index) => (
-                              <div
-                                key={index}
-                                className="border rounded-md p-3 text-sm text-gray-700 bg-gray-50"
-                              >
-                                <p className="font-medium">{fu.description}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(fu.datetime).toLocaleString()}
-                                </p>
-                                {/* <p
+                            client.followups
+                              .slice()
+                              .reverse()
+                              .map((fu, index) => (
+                                <div
+                                  key={index}
+                                  className="border rounded-md p-3 text-sm text-gray-700 bg-gray-50"
+                                >
+                                  <p className="font-medium">
+                                    {fu.description}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {new Date(fu.datetime).toLocaleString()}
+                                  </p>
+                                  {/* <p
                                   className={`text-xs mt-1 font-medium ${
                                     fu.completed
                                       ? "text-green-600"
@@ -937,8 +974,8 @@ export const ClientList = ({
                                 >
                                   {fu.completed ? "Completed" : "Pending"}
                                 </p> */}
-                              </div>
-                            ))
+                                </div>
+                              ))
                           ) : (
                             <p className="text-sm text-gray-500">
                               No follow-up history yet.

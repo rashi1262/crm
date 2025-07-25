@@ -69,7 +69,7 @@ export const ProjectLeadForm = ({
         ? editData.status
         : "Active",
 
-    jdFile: editData?.jd || "",
+    projectDescriptionFile: editData?.projectDescription || "",
     // teamName: editData?.actionDetails?.teamName || "",
 
     // new version of teamName it is array of string on enter add and x remove
@@ -232,7 +232,7 @@ export const ProjectLeadForm = ({
       // clientBudget: Number(formData.clientBudget.replace(/[^0-9.-]+/g, "")),
       clientBudget: Number(formData.clientBudget),
       status: formData.status,
-      jd: formData.jdFile,
+      projectDescription: formData.projectDescriptionFile,
       actionDetails: {
         teamName: formData.teamName,
         followUpDate: formData.followUpDate,
@@ -302,7 +302,7 @@ export const ProjectLeadForm = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, jdFile: file.name }));
+      setFormData((prev) => ({ ...prev, projectDescriptionFile: file.name }));
     }
   };
 
@@ -658,7 +658,7 @@ export const ProjectLeadForm = ({
                   )}
                   <div className="space-y-2">
                     <Label
-                      htmlFor="jdFile"
+                      htmlFor="projectDescriptionFile"
                       className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                     >
                       <Upload className="h-4 w-4 text-blue-600" />
@@ -666,7 +666,7 @@ export const ProjectLeadForm = ({
                     </Label>
                     <div className="relative">
                       <Input
-                        id="jdFile"
+                        id="projectDescriptionFile"
                         type="file"
                         accept=".pdf,.doc,.docx"
                         onChange={handleFileUpload}
@@ -676,12 +676,12 @@ export const ProjectLeadForm = ({
                         type="button"
                         variant="outline"
                         onClick={() =>
-                          document.getElementById("jdFile")?.click()
+                          document.getElementById("projectDescriptionFile")?.click()
                         }
                         className="w-full h-12 border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 rounded-lg"
                       >
                         <Upload className="h-4 w-4 mr-2" />
-                        {formData.jdFile ||
+                        {formData.projectDescriptionFile ||
                           "Upload Project Description (PDF/DOC)"}
                       </Button>
                     </div>

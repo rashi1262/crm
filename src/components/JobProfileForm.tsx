@@ -199,6 +199,7 @@ export const JobProfileForm = ({
       actionDetails: {
         candidateName: formData.candidateName,
         followUpDate: formData.followUpDate,
+        markAsSend: formData.status === "Profile Sent",
       },
     };
     console.log("Payload of Job Cration", payload);
@@ -243,10 +244,39 @@ export const JobProfileForm = ({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (file) {
+  //     setFormData((prev) => ({ ...prev, jdFile: file.name }));
+  //   }
+  // };
+
+  // new
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFormData((prev) => ({ ...prev, jdFile: file.name }));
+    if (!file) return;
+
+    const uploadData = new FormData();
+    uploadData.append("image", file); // "image" must match backend multer field
+
+    try {
+      const response = await fetch("https://api.vidhema.com/upload", {
+        method: "POST",
+        body: uploadData,
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+
+      const result = await response.json();
+      console.log("Upload success:", result);
+
+      // Optionally set the uploaded file name or URL
+      setFormData((prev) => ({
+        ...prev,
+        jdFile: result.imageUrl || file.name, // assume your backend returns imageUrl
+      }));
+    } catch (err) {
+      console.error("Error uploading image:", err);
     }
   };
 

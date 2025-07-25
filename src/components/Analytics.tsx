@@ -23,6 +23,7 @@ import {
   DollarSign,
   Calendar,
   IndianRupee,
+  UserCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import axios from "axios";
@@ -65,6 +66,69 @@ interface JobProfile {
   updatedAt: string;
   __v: number;
 }
+
+
+interface Followup {
+  id: number;
+  description: string;
+  datetime: string;
+  completed: boolean;
+}
+// chatting
+type ChatMessage = {
+  id: number;
+  message: string;
+  timestamp: string;
+};
+
+interface ActionDetails {
+  inboxType?: "employee" | "candidate";
+  employeeId?: string;
+  // teamName?: string | null;
+
+  // new
+  teamName?: string[]; // ✅ Now an array of strings
+  markAsSend?: boolean;
+  followUpDate?: string;
+  lastfollowUpDate?: string;
+}
+
+interface MeetingActionDetails {
+  proceedToMeeting?: boolean;
+  MeetingDateTime?: string;
+  markAsClose?: boolean;
+}
+
+// Main ProjectProfile interface
+interface ProjectProfile {
+  _id: string;
+  clientId: PopulatedClientDetails;
+  title: string;
+  contactPersonName: string;
+  skills: string[];
+  description: string;
+  clientBudget: number;
+  status: string;
+  projectDescription?: string;
+  proposalDescription: string;
+  actionDetails?: ActionDetails;
+  MeetingActionDetails?: MeetingActionDetails;
+  // sentProfiles?: SentProfile[];
+  followups?: Followup[];
+  chatMessages?: ChatMessage[]; // ✅ Add this
+  conversations?: number; // ✅ Add this
+
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+interface ProjectProfileListProps {
+  projects: ProjectProfile[];
+  onUpdate: (projects: ProjectProfile[]) => void;
+  onEdit: (projects: ProjectProfile) => void;
+}
+
 
 interface Client {
   id: string;
@@ -118,6 +182,13 @@ export const Analytics = () => {
     undefined
   );
 
+  // project state
+  const [activeProject,setActiveProject]=useState<ProjectProfile[]|undefined>(undefined)
+  const [leadSentProject,setLeadSentProject]=useState<ProjectProfile[]|undefined>(undefined)
+  const [onholdProject,setOnHoldProject]=useState<ProjectProfile[]|undefined>(undefined)
+  const [closedProject,setClosedProject]=useState<ProjectProfile[]|undefined>(undefined)
+  const [meetingScheduledProject,setMeetingScheduledProject]=useState<ProjectProfile[]|undefined>(undefined)
+
   //  client state
   const [ActiveClient, setActiveClient] = useState<Client[] | undefined>(
     undefined
@@ -158,6 +229,15 @@ export const Analytics = () => {
     { month: "Apr", revenue: 61000, clients: 18 },
     { month: "May", revenue: 58000, clients: 16 },
     { month: "Jun", revenue: 67000, clients: 20 },
+  ];
+
+
+    const ProjectStatusData = [
+     { status: "Active", count: activeProject?.length || 0 },
+    { status: "Lead Sent", count: leadSentProject?.length || 0 },
+    { status: "Meeting Scheduled", count: meetingScheduledProject?.length || 0 },
+    { status: "Closed", count: closedProject?.length || 0 },
+    { status: "On Hold", count: onholdProject?.length || 0 },
   ];
 
   // old jobstatus data
@@ -286,9 +366,47 @@ export const Analytics = () => {
     }
   };
 
+  const getProjectData=async()=>{
+    try {
+      const response = await axios.get(
+        "https://api.vidhema.com/projects"
+      );
+      console.log("This is Project data", response.data);
+      const activeProject = response.data.filter((project) => project.status === "Active");
+      console.log("this is active project data", activeProject);
+      setActiveProject(activeProject);
+
+      //  lead sent 
+      const leadsent = response.data.filter(
+        (project) => project.status === "Lead Sent"
+      );
+      console.log("this is profile sent job", leadsent);
+      setLeadSentProject(leadsent);
+
+      //  Meeting project
+      const meetingproject = response.data.filter(
+        (project) => project.status === "Meeting Scheduled"
+      );
+      console.log("this is Meeting Project", meetingproject);
+      setMeetingScheduledProject(meetingproject);
+      //  closed job
+      const closeproject = response.data.filter((project) => project.status === "Closed" );
+      console.log("this is Closed project", closeproject);
+      setClosedProject(closeproject);
+
+      //  onHold job
+      const onholdproject = response.data.filter((project) => project.status === "On Hold");
+      console.log("this is ON Hold project", onholdproject);
+      setOnHoldProject(onholdProject);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   useEffect(() => {
     getClientData();
     getJobsData();
+    getProjectData()
   }, []);
 
   console.log("Active Client", ActiveClient);
@@ -323,9 +441,9 @@ export const Analytics = () => {
                 <p className="text-3xl font-bold text-green-600">
                   {formatCurrency(totalRevenue) || ""}
                 </p>
-                <p className="text-xs text-green-600 mt-1">
+                {/* <p className="text-xs text-green-600 mt-1">
                   +15.3% from last month
-                </p>
+                </p> */}
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
                 <IndianRupee className="h-6 w-6 text-green-600" />
@@ -339,12 +457,12 @@ export const Analytics = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Conversion Rate
+                 Active Client
                 </p>
-                <p className="text-3xl font-bold text-blue-600">68%</p>
-                <p className="text-xs text-blue-600 mt-1">
+                <p className="text-3xl font-bold text-blue-600">{ActiveClient?.length}</p>
+                {/* <p className="text-xs text-blue-600 mt-1">
                   +5.1% from last month
-                </p>
+                </p> */}
               </div>
               <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
@@ -361,9 +479,9 @@ export const Analytics = () => {
                 <p className="text-3xl font-bold text-purple-600">
                   {(activeJob && activeJob.length) || 0}
                 </p>
-                <p className="text-xs text-purple-600 mt-1">
+                {/* <p className="text-xs text-purple-600 mt-1">
                   +8 new this month
-                </p>
+                </p> */}
               </div>
               <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
                 <Briefcase className="h-6 w-6 text-purple-600" />
@@ -377,15 +495,15 @@ export const Analytics = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Avg. Response Time
+                  Active Project
                 </p>
-                <p className="text-3xl font-bold text-orange-600">2.4h</p>
-                <p className="text-xs text-orange-600 mt-1">
+                <p className="text-3xl font-bold text-orange-600">{activeProject?.length}</p>
+                {/* <p className="text-xs text-orange-600 mt-1">
                   -0.5h improvement
-                </p>
+                </p> */}
               </div>
               <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <Calendar className="h-6 w-6 text-orange-600" />
+                <UserCheck className="h-6 w-6 text-orange-600" />
               </div>
             </div>
           </CardContent>
@@ -395,7 +513,7 @@ export const Analytics = () => {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Trend */}
-        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+        {/* <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-gray-800 flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-blue-600" />
@@ -421,6 +539,26 @@ export const Analytics = () => {
                   strokeWidth={3}
                 />
               </LineChart>
+            </ChartContainer>
+          </CardContent>
+        </Card> */}
+
+        {/* project Status Distribution */}
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-purple-600" />
+              Project Status Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-80">
+              <BarChart data={ProjectStatusData}>
+                <XAxis dataKey="status" />
+                <YAxis />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>

@@ -26,15 +26,10 @@ export interface SolarStationRawBlog {
     success: boolean;
     message?: string;
     data: SolarStationRawBlog[];
-    // pagination?: {
-    //   currentPage: number;
-    //   totalPages: number;
-    //   totalItems: number;
-    //   limit: number;
-    // };
-
-    // new
-    totalBlogs: number;
-  totalPages: number;
-  currentPage: number;
+    pagination?: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      limit: number;
+    };
   }

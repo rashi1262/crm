@@ -53,6 +53,7 @@ interface ActionDetails {
   teamName?: string[]; // ✅ Now an array of strings
   markAsSend?: boolean;
   followUpDate?: string;
+  lastfollowUpDate?: string;
 }
 
 interface MeetingActionDetails {
@@ -71,7 +72,7 @@ interface ProjectProfile {
   description: string;
   clientBudget: number;
   status: string;
-  jd?: string;
+  projectDescription?: string;
   proposalDescription: string;
   actionDetails?: ActionDetails;
   MeetingActionDetails?: MeetingActionDetails;
@@ -227,13 +228,16 @@ export const ProjectLeadList = ({
 
   const updateFollowupDate = async (id: string) => {
     try {
-       console.log("Raw Followup date Updatelist of Project (local):",newFollowupDate);
+      console.log(
+        "Raw Followup date Updatelist of Project (local):",
+        newFollowupDate
+      );
       console.log("Udate followupdate in list of Project", newFollowupDate);
 
       // convert localdateandtime to utc for consistency db
-      const utcDateStr=new Date(newFollowupDate).toISOString()
+      const utcDateStr = new Date(newFollowupDate).toISOString();
       // converted utcDateStr
-       console.log("Converted to UTC in Project  creation :", utcDateStr);
+      console.log("Converted to UTC in Project  creation :", utcDateStr);
       await axios.put(
         `https://api.vidhema.com/projects/${id}`,
         {
@@ -313,7 +317,7 @@ export const ProjectLeadList = ({
 
   // update the SendProposal Description
   const sendProposalDescription = async (id: string) => {
-    if (!proposalDescription ) {
+    if (!proposalDescription) {
       toast({
         title: "Missing Fields",
         description: "Please enter  proposal description ",
@@ -393,16 +397,34 @@ export const ProjectLeadList = ({
       return;
     }
 
+    const selectedDate = new Date(data.datetime);
+    const now = new Date();
+
+    // Validate: Meeting date should not be in the past
+    if (selectedDate.getTime() <= now.getTime()) {
+      toast({
+        title: "Invalid Date/Time",
+        description: "Follow Up time cannot be in the past.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       console.log("Sending followup for project:", projectId);
       console.log("Followup Description:", data.description);
       console.log("Send DateTime:", data.datetime);
-       console.log("Raw Followup date Send Proposal Description Updatelist of Project (local):", data.datetime);
-    console.log("Update followupdate Send Proposal Description in list of Project", data.datetime);
+      console.log(
+        "Raw Followup date Send Proposal Description Updatelist of Project (local):",
+        data.datetime
+      );
+      console.log(
+        "Update followupdate Send Proposal Description in list of Project",
+        data.datetime
+      );
 
-    // Convert local datetime string to UTC ISO format
-    const utcDateStr = new Date(data.datetime).toISOString();
-    console.log("Converted to UTC in Project creation:", utcDateStr);
+      // Convert local datetime string to UTC ISO format
+      const utcDateStr = new Date(data.datetime).toISOString();
+      console.log("Converted to UTC in Project creation:", utcDateStr);
 
       const existingProject = await axios.get(
         `https://api.vidhema.com/projects/${projectId}`
@@ -416,18 +438,31 @@ export const ProjectLeadList = ({
         id: Date.now(),
         description: data.description,
         // datetime: data.datetime,
-          datetime: utcDateStr,  // use UTC here
+        datetime: utcDateStr, // use UTC here
         completed: false,
       };
 
       const updatedFollowups = [...existingFollowups, newFollowup];
 
+      // ✅ Sort followups from latest to oldest
+      const sortedFollowups = [...updatedFollowups].sort(
+        (a, b) =>
+          new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+      );
+
+      // ✅ Safely get the top two follow-ups
+      const followUpDate = sortedFollowups[0]?.datetime || null;
+      const lastfollowUpDate =
+        sortedFollowups[1]?.datetime || sortedFollowups[0]?.datetime || null;
+
       const payload = {
         followups: updatedFollowups,
         actionDetails: {
           //followUpDate: data.datetime,
-           followUpDate: utcDateStr,  // also update followUpDate in UTC
+          // followUpDate: utcDateStr, // also update followUpDate in UTC
+          followUpDate: followUpDate,
           teamName: existingTeamName,
+          lastfollowUpDate: lastfollowUpDate,
         },
       };
 
@@ -470,12 +505,24 @@ export const ProjectLeadList = ({
       });
       return;
     }
+    const selectedDate = new Date(MeetingDate);
+    const now = new Date();
+
+    // Validate: Meeting date should not be in the past
+    if (selectedDate.getTime() <= now.getTime()) {
+      toast({
+        title: "Invalid Date/Time",
+        description: "Meeting time cannot be in the past.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       console.log("Raw Meeting Date (local):", MeetingDate);
 
-    // Convert MeetingDate to UTC ISO string
-    const utcMeetingDate = new Date(MeetingDate).toISOString();
-    console.log("Converted Meeting Date to UTC:", utcMeetingDate);
+      // Convert MeetingDate to UTC ISO string
+      const utcMeetingDate = new Date(MeetingDate).toISOString();
+      console.log("Converted Meeting Date to UTC:", utcMeetingDate);
       await axios.put(
         `https://api.vidhema.com/projects/${id}`,
         {
@@ -623,16 +670,15 @@ export const ProjectLeadList = ({
                         </div>
                       )}
                     </div> */}
-                    
+
                     {/* new followupdate */}
-                      <div className="flex items-center gap-2">
-                          <span>
-                            {new Date(
-                              project.actionDetails.followUpDate
-                            ).toLocaleDateString()}
-                          </span>
-                          </div>
-                  
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {new Date(
+                          project.actionDetails.followUpDate
+                        ).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1020,19 +1066,22 @@ export const ProjectLeadList = ({
                           <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                             {project.followups &&
                             project.followups.length > 0 ? (
-                              project.followups.map((fu, index) => (
-                                <div
-                                  key={index}
-                                  className="border rounded-md p-3 text-sm text-gray-700 bg-gray-50"
-                                >
-                                  <p className="font-medium">
-                                    {fu.description}
-                                  </p>
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    {new Date(fu.datetime).toLocaleString()}
-                                  </p>
-                                </div>
-                              ))
+                              project.followups
+                                .slice()
+                                .reverse()
+                                .map((fu, index) => (
+                                  <div
+                                    key={index}
+                                    className="border rounded-md p-3 text-sm text-gray-700 bg-gray-50"
+                                  >
+                                    <p className="font-medium">
+                                      {fu.description}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {new Date(fu.datetime).toLocaleString()}
+                                    </p>
+                                  </div>
+                                ))
                             ) : (
                               <p className="text-sm text-gray-500">
                                 No follow-up history yet.
@@ -1119,7 +1168,6 @@ export const ProjectLeadList = ({
                         </form>
                       </DialogContent>
                     </Dialog>
-                 
                     {/* Schedule Meeting Button (if Lead Sent) */}
                     {project.status === "Lead Sent" && (
                       <Dialog
