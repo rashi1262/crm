@@ -159,6 +159,7 @@ const handleSubmit = async (e) => {
     if (!response.ok) throw new Error("Failed to save blog");
 
     toast({ title: "Success", description: "Blog added successfully" });
+    navigate("/blog");
   } catch (err) {
     toast({ title: "Error", description: err.message, variant: "destructive" });
   } finally {
