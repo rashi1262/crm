@@ -160,6 +160,8 @@ const handleSubmit = async (e) => {
 
     toast({ title: "Success", description: "Blog added successfully" });
     navigate("/blog");
+
+    
   } catch (err) {
     toast({ title: "Error", description: err.message, variant: "destructive" });
   } finally {
