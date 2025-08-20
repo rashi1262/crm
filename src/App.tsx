@@ -35,6 +35,7 @@ import EditBlog from './components/EditBlog';
 import ProtectedRoute from "./Routes/ProtectedRoute";
 import PublicRoute from "./Routes/PublicRoute";
 import Profile from "./components/Profile";
+import EditVidhemaBlogForm from "./components/EditVidhemaBlogForm";
 
 const queryClient = new QueryClient();
 
@@ -90,7 +91,7 @@ const App = () => {
                  <Route path="profile" element={<Profile />} />
               </Route>
 
-              
+              <Route path="/blog/vidhema/edit/:slug" element={<EditVidhemaBlogForm />} />
 
               
             </Route>
