@@ -20,6 +20,7 @@ import {
   ClipboardList,
   BookOpen,
 } from "lucide-react";
+import RichTextEditorField from "./RichTextEditorField.";
 
 export default function AddVidhemaBlogForm(): JSX.Element {
   const navigate = useNavigate();
@@ -27,9 +28,9 @@ export default function AddVidhemaBlogForm(): JSX.Element {
   const [loading, setLoading] = useState(false);
 
   const [authors, setAuthors] = useState<{ _id: string; name: string }[]>([]);
-  const [categories, setCategories] = useState<{ _id: string; title: string }[]>(
-    []
-  );
+  const [categories, setCategories] = useState<
+    { _id: string; title: string }[]
+  >([]);
 
   const vidhemaAccessToken =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVmMGMxMDY1NGM1ZDUwMGY2NDM3YmQzMSIsImVtYWlsIjoic2FsZXNAdmlkaGVtYS5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTI2NDQyNjIsImV4cCI6MTc1MjczMDY2Mn0.mpg--uAlcSkTXMWTZShBgq-p58gnlgPDv9bs8zniY8E";
@@ -60,9 +61,15 @@ export default function AddVidhemaBlogForm(): JSX.Element {
 
   // State for image files and previews
   const [featuredImageFile, setFeaturedImageFile] = useState<File | null>(null);
-  const [featuredImagePreviewUrl, setFeaturedImagePreviewUrl] = useState<string | null>(null);
-  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
-  const [backgroundImagePreviewUrl, setBackgroundImagePreviewUrl] = useState<string | null>(null);
+  const [featuredImagePreviewUrl, setFeaturedImagePreviewUrl] = useState<
+    string | null
+  >(null);
+  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(
+    null
+  );
+  const [backgroundImagePreviewUrl, setBackgroundImagePreviewUrl] = useState<
+    string | null
+  >(null);
 
   // State for raw string inputs
   const [vidhemaTagsInput, setVidhemaTagsInput] = useState("");
@@ -70,25 +77,38 @@ export default function AddVidhemaBlogForm(): JSX.Element {
 
   const baseURL = import.meta.env.VITE_API_URL;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
+// Updated handleChange to support both input/textarea and JoditEditor
+const handleChange = (
+  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string,
+  editorValue?: string
+) => {
+  // Case 1: If called from RichTextEditorField
+  if (typeof e === "string" && editorValue !== undefined) {
+    const id = e; // "description" or field name
+    const value = editorValue;
 
-    // Handle nested metatags fields
-    if (id.startsWith("metatags.")) {
-      const key = id.split(".")[1];
-      setFormData(prev => ({
-        ...prev,
-        metatags: { ...prev.metatags, [key]: value },
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [id]: value }));
-    }
-  };
+    setFormData((prev) => ({ ...prev, [id]: value }));
+    return;
+  }
+
+  // Case 2: Normal input/textarea
+  const { id, value } = (e as React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>).target;
+
+  if (id.startsWith("metatags.")) {
+    const key = id.split(".")[1];
+    setFormData((prev) => ({
+      ...prev,
+      metatags: { ...prev.metatags, [key]: value },
+    }));
+  } else {
+    setFormData((prev) => ({ ...prev, [id]: value }));
+  }
+};
 
   const handleVidhemaTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setVidhemaTagsInput(value);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       metatags: { ...prev.metatags, Keyword: value },
     }));
@@ -97,88 +117,96 @@ export default function AddVidhemaBlogForm(): JSX.Element {
   const handleFaqChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setFaqInput(value);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      faq: value.split("\n").map(item => item.trim()).filter(item => item.length > 0),
+      faq: value
+        .split("\n")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
     }));
   };
 
-const handleFeaturedImageFileChange = (e) => {
-  const file = e.target.files?.[0];
-  setFeaturedImageFile(file || null);
-};
+  const handleFeaturedImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    setFeaturedImageFile(file || null);
+  };
 
-const handleBackgroundImageFileChange = (e) => {
-  const file = e.target.files?.[0];
-  setBackgroundImageFile(file || null);
-};
+  const handleBackgroundImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    setBackgroundImageFile(file || null);
+  };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append("title", formData.title);
+      formDataToSend.append("url", formData.url);
+      formDataToSend.append("shortDescription", formData.shortDescription);
+      formDataToSend.append("description", formData.description);
+      formDataToSend.append("technology", formData.technology);
+      formDataToSend.append("authorId", formData.authorId);
+      formDataToSend.append("date", formData.date);
+      formDataToSend.append("status", formData.status ? "true" : "false");
+      formDataToSend.append("categoryids[]", formData.categoryids[0]);
 
-  try {
-    const formDataToSend = new FormData();
-    formDataToSend.append("title", formData.title);
-    formDataToSend.append("url", formData.url);
-    formDataToSend.append("shortDescription", formData.shortDescription);
-    formDataToSend.append("description", formData.description);
-    formDataToSend.append("technology", formData.technology);
-    formDataToSend.append("authorId", formData.authorId);
-    formDataToSend.append("date", formData.date);
-    formDataToSend.append("status", formData.status ? "true" : "false");
-    formDataToSend.append("categoryids[]", formData.categoryids[0]);
+      // Meta tags
+      Object.keys(formData.metatags).forEach((key) => {
+        formDataToSend.append(`metatags[${key}]`, formData.metatags[key]);
+      });
 
-    // Meta tags
-    Object.keys(formData.metatags).forEach(key => {
-      formDataToSend.append(`metatags[${key}]`, formData.metatags[key]);
-    });
+      // FAQ array
+      formData.faq.forEach((item, index) => {
+        formDataToSend.append(`faq[${index}]`, item);
+      });
 
-    // FAQ array
-    formData.faq.forEach((item, index) => {
-      formDataToSend.append(`faq[${index}]`, item);
-    });
+      // Images (files)
+      if (featuredImageFile) {
+        formDataToSend.append("featured_image", featuredImageFile);
+      }
+      if (backgroundImageFile) {
+        formDataToSend.append("background_image", backgroundImageFile);
+      }
 
-    // Images (files)
-    if (featuredImageFile) {
-      formDataToSend.append("featured_image", featuredImageFile);
+      const response = await fetch(`${baseURL}/blogs`, {
+        method: "POST",
+        headers: {
+          access_token: vidhemaAccessToken,
+        },
+        body: formDataToSend,
+      });
+
+      if (!response.ok) throw new Error("Failed to save blog");
+
+      toast({ title: "Success", description: "Blog added successfully" });
+      navigate("/blog");
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    if (backgroundImageFile) {
-      formDataToSend.append("background_image", backgroundImageFile);
-    }
-
-    const response = await fetch(`${baseURL}/blogs`, {
-      method: "POST",
-      headers: {
-        access_token: vidhemaAccessToken,
-      },
-      body: formDataToSend,
-    });
-
-    if (!response.ok) throw new Error("Failed to save blog");
-
-    toast({ title: "Success", description: "Blog added successfully" });
-    navigate("/blog");
-
-    
-  } catch (err) {
-    toast({ title: "Error", description: err.message, variant: "destructive" });
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   useEffect(() => {
     const fetchAuthorsAndCategories = async () => {
       try {
         const [authorsRes, categoriesRes] = await Promise.all([
-          fetch(`${baseURL}/authors`, { headers: { access_token: vidhemaAccessToken } }),
-          fetch(`${baseURL}/categories`, { headers: { access_token: vidhemaAccessToken } }),
+          fetch(`${baseURL}/authors`, {
+            headers: { access_token: vidhemaAccessToken },
+          }),
+          fetch(`${baseURL}/categories`, {
+            headers: { access_token: vidhemaAccessToken },
+          }),
         ]);
 
-        if (!authorsRes.ok || !categoriesRes.ok) throw new Error("Failed to fetch authors/categories");
+        if (!authorsRes.ok || !categoriesRes.ok)
+          throw new Error("Failed to fetch authors/categories");
 
         const authorsData = await authorsRes.json();
         const categoriesData = await categoriesRes.json();
@@ -243,7 +271,10 @@ const handleSubmit = async (e) => {
 
           {/* Short Description */}
           <div className="space-y-2 col-span-1 md:col-span-2">
-            <Label htmlFor="shortDescription" className="flex items-center gap-1">
+            <Label
+              htmlFor="shortDescription"
+              className="flex items-center gap-1"
+            >
               <Info className="h-4 w-4 text-purple-500" /> Short Description{" "}
               <span className="text-red-500">*</span>
             </Label>
@@ -260,15 +291,16 @@ const handleSubmit = async (e) => {
           {/* Description */}
           <div className="space-y-2 col-span-1 md:col-span-2">
             <Label htmlFor="description" className="flex items-center gap-1">
-              <FileText className="h-4 w-4 text-orange-500" /> Detail Description{" "}
-              <span className="text-red-500">*</span>
+              <FileText className="h-4 w-4 text-orange-500" /> Detail
+              Description <span className="text-red-500">*</span>
             </Label>
-            <Textarea
-              id="description"
+
+            {/* Jodit Editor instead of Textarea */}
+            <RichTextEditorField
+              name="description"
               value={formData.description}
               onChange={handleChange}
-              required
-              rows={8}
+
               placeholder="The detailed content of the blog post"
             />
           </div>
@@ -288,7 +320,10 @@ const handleSubmit = async (e) => {
 
           {/* Featured Image */}
           <div className="space-y-2">
-            <Label htmlFor="featuredImageUpload" className="flex items-center gap-1">
+            <Label
+              htmlFor="featuredImageUpload"
+              className="flex items-center gap-1"
+            >
               <Image className="h-4 w-4 text-teal-500" /> Featured Image{" "}
               <span className="text-red-500">*</span>
             </Label>
@@ -314,7 +349,10 @@ const handleSubmit = async (e) => {
 
           {/* Background Image */}
           <div className="space-y-2">
-            <Label htmlFor="backgroundImageUpload" className="flex items-center gap-1">
+            <Label
+              htmlFor="backgroundImageUpload"
+              className="flex items-center gap-1"
+            >
               <Image className="h-4 w-4 text-teal-500" /> Background Image
             </Label>
             <Input
@@ -359,14 +397,14 @@ const handleSubmit = async (e) => {
             <select
               id="select_author"
               value={formData.authorId}
-              onChange={e =>
-                setFormData(prev => ({ ...prev, authorId: e.target.value }))
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, authorId: e.target.value }))
               }
               required
               className="border border-gray-300 rounded-md p-2 w-full"
             >
               <option value="">Select an Author</option>
-              {authors.map(author => (
+              {authors.map((author) => (
                 <option key={author._id} value={author._id}>
                   {author.name}
                 </option>
@@ -376,21 +414,27 @@ const handleSubmit = async (e) => {
 
           {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="select_category" className="flex items-center gap-1">
+            <Label
+              htmlFor="select_category"
+              className="flex items-center gap-1"
+            >
               <Tag className="h-4 w-4 text-gray-500" /> Category{" "}
               <span className="text-red-500">*</span>
             </Label>
             <select
               id="select_category"
               value={formData.categoryids[0] || ""}
-              onChange={e =>
-                setFormData(prev => ({ ...prev, categoryids: [e.target.value] }))
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  categoryids: [e.target.value],
+                }))
               }
               required
               className="border border-gray-300 rounded-md p-2 w-full"
             >
               <option value="">Select a Category</option>
-              {categories.map(cat => (
+              {categories.map((cat) => (
                 <option key={cat._id} value={cat._id}>
                   {cat.title}
                 </option>
@@ -400,8 +444,12 @@ const handleSubmit = async (e) => {
 
           {/* Meta Tags */}
           <div className="space-y-2 col-span-1 md:col-span-2">
-            <Label htmlFor="metatags.Keyword" className="flex items-center gap-1">
-              <Hash className="h-4 w-4 text-pink-500" /> Meta Tags (comma-separated)
+            <Label
+              htmlFor="metatags.Keyword"
+              className="flex items-center gap-1"
+            >
+              <Hash className="h-4 w-4 text-pink-500" /> Meta Tags
+              (comma-separated)
             </Label>
             <Input
               id="metatags.Keyword"
@@ -482,7 +530,8 @@ const handleSubmit = async (e) => {
         </div>
 
         <Button type="submit" disabled={loading} className="w-full md:w-auto">
-          <Save className="mr-2 h-4 w-4" /> {loading ? "Saving..." : "Save Blog"}
+          <Save className="mr-2 h-4 w-4" />{" "}
+          {loading ? "Saving..." : "Save Blog"}
         </Button>
       </form>
     </div>
