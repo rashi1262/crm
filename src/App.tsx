@@ -36,6 +36,8 @@ import ProtectedRoute from "./Routes/ProtectedRoute";
 import PublicRoute from "./Routes/PublicRoute";
 import Profile from "./components/Profile";
 import EditVidhemaBlogForm from "./components/EditVidhemaBlogForm";
+import { Support } from "./components/Support";
+import AddFollowUps from "./components/AddFollowUps";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +68,7 @@ const App = () => {
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 {/* new All followup filter */}
                <Route path="allfollowup" element={<AllFollowUps />} />
+               <Route path="addfollowup" element={<AddFollowUps />} />
 
                 {/* Existing Protected Routes */}
                 <Route path="dashboard" element={<Dashboard />} />
@@ -86,6 +89,8 @@ const App = () => {
                 {/* Update this route to use the new AddBlogPage component */}
                 <Route path="blog/add" element={<AddBlogPage />} /> {/* <--- CHANGED THIS LINE */}
                 <Route path="blog/edit/:slug" element={<EditBlog />} />
+
+                <Route path="support" element={<Support/> } />
 
                 {/* new profile page route */}
                  <Route path="profile" element={<Profile />} />

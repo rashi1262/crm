@@ -7,6 +7,7 @@ import {
   UserCheck,
   Newspaper,
   Calendar,
+  HelpCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -51,6 +52,8 @@ export const Sidebar = () => {
     { id: "analytics", label: "Analytics", icon: BarChart, path: "/analytics" },
     { id: "blog", label: "Blogs", icon: Newspaper, path: "/blog" },
     { id: "allfollowup", label: "All Follow Ups", icon: Calendar, path: "/allfollowup" },
+    { id: "addfollowup", label: "Add Follow Ups", icon: Calendar, path: "/addfollowup" },
+    { id: "vidhemaSupport", label: "Vidhema Support", icon: HelpCircle, path: "/support" }
   ];
 
   useEffect(()=>{

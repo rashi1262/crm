@@ -136,6 +136,7 @@ interface ProjectProfile {
 
 export const AllFollowUps = () => {
   const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
+  const [newFollowUp, setNewFollowUp] = useState<any[]>([]);
 
   const [filterForm, setFilterForm] = useState({
     contactPersonName: "",
@@ -195,9 +196,9 @@ export const AllFollowUps = () => {
 
     const contactPersonMatch = contactPersonFilter
       ? job.contactPersonName
-          ?.toLowerCase()
-          .trim()
-          .includes(contactPersonFilter)
+        ?.toLowerCase()
+        .trim()
+        .includes(contactPersonFilter)
       : true;
 
     // --- Date Filtering ---
@@ -268,8 +269,8 @@ export const AllFollowUps = () => {
   const handleChange = (field: string, value: string) => {
     setFilterForm((prev) => ({ ...prev, [field]: value }));
   };
-  
-  
+
+
   const getAllClients = async () => {
     try {
       const response = await axios.get(`${baseURL}/clients`);
@@ -876,6 +877,100 @@ export const AllFollowUps = () => {
 
   console.log("New upcoing followup client", newupcomingFollowups);
   console.log("Next followup next followup client", nextFollowupClient);
+
+  const filteredNewFollowups = newFollowUp.filter((followup) => {
+    const clientNameFilter =
+      filterForm.clientName === "All-Client"
+        ? ""
+        : filterForm.clientName.trim().toLowerCase();
+
+    const contactPersonFilter = filterForm.contactPersonName
+      .trim()
+      .toLowerCase();
+
+    // ✅ Match client name inside followup.clientId.name
+    const clientMatch = clientNameFilter
+      ? followup.clientId?.name?.toLowerCase().includes(clientNameFilter)
+      : true;
+
+    // ✅ Match contact person inside followup.contactPersonId.fullName
+    const contactMatch = contactPersonFilter
+      ? followup.contactPersonId?.fullName
+        ?.toLowerCase()
+        .includes(contactPersonFilter)
+      : true;
+
+    // Date filtering (same logic as before)
+    let startDate = filterForm.startfollowUpDate
+      ? new Date(filterForm.startfollowUpDate)
+      : null;
+
+    let endDate = filterForm.endfollowUpDate
+      ? new Date(filterForm.endfollowUpDate)
+      : null;
+
+    if (startDate) {
+      startDate = new Date(
+        Date.UTC(
+          startDate.getUTCFullYear(),
+          startDate.getUTCMonth(),
+          startDate.getUTCDate(),
+          0,
+          0,
+          0,
+          0
+        )
+      );
+    }
+
+    if (endDate) {
+      endDate = new Date(
+        Date.UTC(
+          endDate.getUTCFullYear(),
+          endDate.getUTCMonth(),
+          endDate.getUTCDate(),
+          23,
+          59,
+          59,
+          999
+        )
+      );
+    }
+
+    const followupTime = new Date(followup.followUpDate);
+    const dateMatch =
+      (!startDate || followupTime >= startDate) &&
+      (!endDate || followupTime <= endDate);
+
+    const match = clientMatch && contactMatch && dateMatch;
+
+    console.log(
+      `Filtering followup for client "${followup.clientId?.name}" | contact: ${followup.contactPersonId?.fullName} | clientMatch: ${clientMatch} | contactMatch: ${contactMatch} | dateMatch ${dateMatch} | finalMatch: ${match}`
+    );
+
+    return match;
+  });
+
+  const indexOfLastNewFollowup = currentPage * itemsPerPage;
+  const indexOfFirstNewFollowup = indexOfLastNewFollowup - itemsPerPage;
+  const currentNewFollowups = filteredNewFollowups.slice(
+    indexOfFirstNewFollowup,
+    indexOfLastNewFollowup
+  );
+  const totalNewFollowupPages = Math.ceil(filteredNewFollowups.length / itemsPerPage);
+  console.log("Filtered New Followups:", filteredNewFollowups);
+
+  // get all new followup
+  const getNewFollowUp = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/newfollowups`);
+      setNewFollowUp(response.data.data);
+      console.log(`All new followup Data `, newFollowUp);
+    } catch (err) {
+      console.log("Failed to fetch all new followup", err);
+    }
+  };
+
   useEffect(() => {
     getAllClients();
   }, []);
@@ -887,6 +982,8 @@ export const AllFollowUps = () => {
       getProjectData();
     } else if (filterForm.searchOf === "Client-Follow-Ups") {
       getClientData();
+    } else if (filterForm.searchOf === "New-Follow-Ups") {
+      getNewFollowUp();
     }
     setCurrentPage(1);
   }, [
@@ -961,10 +1058,6 @@ export const AllFollowUps = () => {
       </div>
 
       {/* input filter for searching the api */}
-
-      {/* <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Filter Follow-Ups
-        </h2> */}
       <div className="relative bg-white p-6 rounded-xl shadow-md border border-gray-200 mb-4 overflow-x-auto">
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <Filter className="h-5 w-5 text-blue-600" />
@@ -1102,6 +1195,12 @@ export const AllFollowUps = () => {
                 >
                   Project Follow-Ups
                 </SelectItem>
+                <SelectItem
+                  value="New-Follow-Ups"
+                  className="py-2 px-4 hover:bg-blue-50 rounded"
+                >
+                  New Follow-Ups
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1175,8 +1274,8 @@ export const AllFollowUps = () => {
                               </span>{" "}
                               {job?.actionDetails?.followUpDate
                                 ? new Date(job.actionDetails.followUpDate)
-                                    .toISOString()
-                                    .split("T")[0]
+                                  .toISOString()
+                                  .split("T")[0]
                                 : "N/A"}
                             </p>
 
@@ -1290,8 +1389,8 @@ export const AllFollowUps = () => {
                               </span>{" "}
                               {project?.actionDetails?.followUpDate
                                 ? new Date(
-                                    project.actionDetails.followUpDate
-                                  ).toLocaleDateString()
+                                  project.actionDetails.followUpDate
+                                ).toLocaleDateString()
                                 : "N/A"}
                             </p>
 
@@ -1404,8 +1503,8 @@ export const AllFollowUps = () => {
                               </span>{" "}
                               {client.nextFollowup
                                 ? new Date(
-                                    client.nextFollowup
-                                  ).toLocaleDateString()
+                                  client.nextFollowup
+                                ).toLocaleDateString()
                                 : "N/A"}
                             </p>
 
@@ -1458,6 +1557,84 @@ export const AllFollowUps = () => {
               )}
             </>
           )}
+
+          {/* ======= NEW FOLLOWUP VIEW ======= */}
+          {filterForm.searchOf === "New-Follow-Ups" && (
+            <>
+              {filteredNewFollowups.length === 0 ? (
+                <p className="text-gray-500 text-center mt-6">
+                  No new follow-ups found.
+                </p>
+              ) : (
+                <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                    {filteredNewFollowups
+                      .slice() // make a shallow copy
+                      .reverse() // latest first
+                      .slice(indexOfFirstClient, indexOfLastClient)
+                      .map((followup) => (
+                        <div
+                          key={followup.id}
+                          className="bg-white shadow-xl p-6 rounded-xl border border-gray-200 hover:shadow-2xl transition-all duration-300"
+                        >
+                          <h3 className="text-xl font-semibold text-green-700 mb-4 truncate">
+                            {followup.clientId.name || "Unnamed Client"}
+                          </h3>
+
+                          <div className="space-y-2 text-sm text-gray-700">
+                            <p>
+                              <span className="font-medium">Status:</span>{" "}
+                              {followup.status || "N/A"}
+                            </p>
+                            <p>
+                              <span className="font-medium">Contact Person:</span>{" "}
+                              {followup.contactPersonId.fullName || "N/A"}
+                            </p>
+                            <p>
+                              <span className="font-medium">Email:</span>{" "}
+                              {followup.contactPersonId.email || "N/A"}
+                            </p>
+                            <p>
+                              <span className="font-medium">Follow-up Date:</span>{" "}
+                              {followup?.followUpDate
+                                ? new Date(followup.followUpDate).toLocaleDateString()
+                                : "N/A"}
+                            </p>
+
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex justify-center items-center gap-4 mt-8">
+                    <button
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      className="px-4 py-2 bg-gray-200 text-sm rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+
+                    <span className="text-sm font-medium">
+                      Page {currentPage} of {totalNewFollowupPages}
+                    </span>
+
+                    <button
+                      disabled={currentPage === totalNewFollowupPages}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalNewFollowupPages))
+                      }
+                      className="px-4 py-2 bg-gray-200 text-sm rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
         </div>
       </div>
     </div>
