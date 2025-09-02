@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IndianRupee } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import { toast } from "@/components/ui/use-toast";
+
 import {
   Select,
   SelectContent,
@@ -25,18 +27,19 @@ import {
   FileText,
   Users,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-interface JobProfileFormProps {
+interface ProjectProfileFormProps {
   onSave: () => void;
   onCancel: () => void;
   editData?: any;
 }
 
-export const JobProfileForm = ({
+export const ProjectLeadForm = ({
   onSave,
   onCancel,
   editData,
-}: JobProfileFormProps) => {
+}: ProjectProfileFormProps) => {
   const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -58,24 +61,46 @@ export const JobProfileForm = ({
     //   : "",
     // new ly so that skills should be at down
     skills: editData?.skills ?? [],
+
     description: editData?.description || "",
-    status: editData ? editData.status : "Active",
-    jdFile: editData?.jd || "",
-    candidateName: editData?.actionDetails?.candidateName || "",
+    // status: editData ? editData.status : "Active",
+    status:
+      editData && typeof editData.status === "string"
+        ? editData.status
+        : "Active",
+
+    projectDescriptionFile: editData?.projectDescription || "",
+    // teamName: editData?.actionDetails?.teamName || "",
+
+    // new version of teamName it is array of string on enter add and x remove
+    teamName: editData?.actionDetails?.teamName
+      ? Array.isArray(editData.actionDetails.teamName)
+        ? editData.actionDetails.teamName
+        : [editData.actionDetails.teamName]
+      : [],
   });
 
-  useEffect(() => {
-    const getAllClients = async () => {
-      try {
-        const response = await axios.get(`${baseURL}/clients`);
-        setClients(response.data.data);
-        console.log(response.data.data, "client data");
-      } catch (error) {
-        console.log("error", error);
+  // this is for the teamName enter and delte
+  const handleTeamKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const input = e.currentTarget.value.trim();
+      if (input && !formData.teamName.includes(input)) {
+        setFormData((prev) => ({
+          ...prev,
+          teamName: [...prev.teamName, input],
+        }));
+        e.currentTarget.value = "";
       }
-    };
-    getAllClients();
-  }, []);
+    }
+  };
+
+  const removeTeam = (teamToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      teamName: prev.teamName.filter((team) => team !== teamToRemove),
+    }));
+  };
 
   // this for the skill enter and delet
   const handleSkillKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -99,6 +124,25 @@ export const JobProfileForm = ({
     }));
   };
 
+  useEffect(() => {
+    const getAllClients = async () => {
+      try {
+        const response = await axios.get(`${baseURL}/clients`);
+        setClients(response.data.data);
+        console.log(
+          "This is project getting  data through projectlead form page",
+          response.data.data
+        );
+        console.log(response.data.data, "client data");
+      } catch (error) {
+        console.log("error", error);
+      }
+    };
+    getAllClients();
+  }, []);
+
+  const navigate = useNavigate();
+
   // getting the env data of the api
 
   const baseURL = import.meta.env.VITE_API_URL;
@@ -115,14 +159,14 @@ export const JobProfileForm = ({
         title: " Enter the Client",
         description: "The Client has not been selected.",
       });
-
       return;
     }
+
     // Validate title
     if (!formData.title.trim()) {
       toast({
         title: "⚠️ Missing Field",
-        description: "Job title is required.",
+        description: "Project title is required.",
         variant: "destructive",
       });
       return;
@@ -138,15 +182,6 @@ export const JobProfileForm = ({
       return;
     }
 
-    // Validate Candidate Name
-    if (!formData.candidateName.trim()) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "candidateName is required.",
-        variant: "destructive",
-      });
-      return;
-    }
     // Validate follow-up date
     if (!formData.followUpDate) {
       toast({
@@ -177,23 +212,18 @@ export const JobProfileForm = ({
       return;
     }
 
-    console.log('Uploading to:', `${baseURL}/upload`);
-
-    let jdImageUrl = typeof formData.jdFile === "string" ? formData.jdFile : "";
-
-    if (formData.jdFile instanceof File) {
-      const uploadData = new FormData();
-      uploadData.append("image", formData.jdFile);
-      try {
-        const res = await axios.post(
-          `${baseURL}/upload`,
-          uploadData,
-          {
-            headers: { "Content-Type": "multipart/form-data" },
-          }
-        );
-        console.log("Response of image upload", res.data);
-        jdImageUrl = res.data.imageUrl;
+     let projectDescribeImageUrl=typeof formData.projectDescriptionFile==='string' ? formData.projectDescriptionFile : "";
+    
+        if(formData.projectDescriptionFile instanceof File)
+        {
+           const uploadData=new FormData()
+           uploadData.append("image", formData.projectDescriptionFile); 
+           try {
+        const res = await axios.post(`${baseURL}/upload`, uploadData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        console.log('Response of image upload',res.data)
+        projectDescribeImageUrl = res.data.imageUrl;
       } catch (uploadErr) {
         console.error("Upload failed:", uploadErr);
         toast({
@@ -203,15 +233,16 @@ export const JobProfileForm = ({
         });
         return;
       }
-    }
+        }
+    
+      // console.log("Raw Followup date creation of Project (local):",formData.followUpDate);
+      // console.log("Udate followupdate in creation of Project", formData.followUpDate);
 
-    //  console.log("Raw Followup date creation of client (local):",formData.followUpDate);
-    //   console.log("Udate followupdate in creation of client", formData.followUpDate);
+      // // convert localdateandtime to utc for consistency db
+      // const utcDateStr=new Date(formData.followUpDate).toISOString()
+      // // converted utcDateStr
+      //  console.log("Converted to UTC in Project  creation :", utcDateStr);
 
-    //   // convert localdateandtime to utc for consistency db
-    //   const utcDateStr=new Date(formData.followUpDate).toISOString()
-    //   // converted utcDateStr
-    //    console.log("Converted to UTC in client creation :", utcDateStr);
     const payload = {
       clientId: selectedClient._id,
       title: formData.title,
@@ -219,53 +250,71 @@ export const JobProfileForm = ({
       // skills: formData.skills.split(",").map((skill: string) => skill.trim()),
       // enter based skill set
       skills: formData.skills,
+
       description: formData.description,
       // clientBudget: Number(formData.clientBudget.replace(/[^0-9.-]+/g, "")),
       clientBudget: Number(formData.clientBudget),
       status: formData.status,
-      // jd: formData.jdFile,
-      jd: jdImageUrl,
+      projectDescription:projectDescribeImageUrl,
       actionDetails: {
-        candidateName: formData.candidateName,
+        teamName: formData.teamName,
         followUpDate: formData.followUpDate,
-        
-        markAsSend: formData.status === "Profile Sent",
+        // followUpDate: utcDateStr,
+        lastfollowUpDate: formData.followUpDate || new Date().toISOString(), // Safe fallback
       },
+      proposalDescription: "", // ✅ <-- add this explicitly
     };
-    console.log("Payload of Job Cration", payload);
+
+    // new
+    // Logging payload fields with their types:
+    console.log("Logging payload with types:", payload);
+    for (const [key, value] of Object.entries(payload)) {
+      if (typeof value === "object" && value !== null) {
+        console.log(`${key}:`, value, `(type: ${typeof value})`);
+        // If nested object, log its keys too
+        for (const [subKey, subValue] of Object.entries(value)) {
+          console.log(`  ${subKey}:`, subValue, `(type: ${typeof subValue})`);
+        }
+      } else {
+        console.log(`${key}:`, value, `(type: ${typeof value})`);
+      }
+    }
+
     try {
       if (editData) {
         const response = await axios.put(
-          `${baseURL}/updateJobProfile/${editData._id}`,
+          `${baseURL}/projects/${editData._id}`,
           payload
         );
+        console.log("This is response data of edit", response.data);
         toast({
-          title: "✅ Job Updated",
-          description: "The Job  was updated successfully.",
+          title: "✅ Project Updated",
+          description: "The project  was updated successfully.",
         });
-        console.log("Responde data form backend when edit", response.data);
       } else {
         const response = await axios.post(
-          `${baseURL}/createJobProfile`,
+          `${baseURL}/projects`,
           payload
         );
-        console.log("Edit time Payload", payload);
         toast({
-          title: "✅ Job Created",
-          description: "The new Job  has been created.",
+          title: "✅ Project Created",
+          description: "The new project  has been created.",
         });
-        console.log("Responde data form backend when created", response.data);
+
+        console.log("This is response data", response.data);
       }
+      console.log("Payload", payload);
+
       onSave();
     } catch (error) {
-      console.log("Failed to save job profile");
+      console.log("Failed to save project  profile");
       console.error(error);
       toast({
         variant: "destructive",
         title: "❌ Error",
         description:
           error?.response?.data?.message ||
-          "Failed to save the Job . Please try again.",
+          "Failed to save the project . Please try again.",
       });
     }
   };
@@ -277,36 +326,9 @@ export const JobProfileForm = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, jdFile: file }));
+      setFormData((prev) => ({ ...prev, projectDescriptionFile: file }));
     }
   };
-
-  //   // new
-  //  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0];
-  //   if (!file) return;
-
-  //   const uploadData = new FormData();
-  //   uploadData.append("image", file); // match this with your backend multer field name
-
-  //   try {
-  //     const response = await axios.post(`${baseURL}/upload`, uploadData, {
-  //       headers: {
-  //         "Content-Type": "multipart/form-data",
-  //       },
-  //     });
-
-  //     console.log("Upload success:", response.data);
-
-  //     // Update your form state with uploaded file URL or name
-  //     setFormData((prev) => ({
-  //       ...prev,
-  //       jdFile: response.data.imageUrl || file.name,
-  //     }));
-  //   } catch (err) {
-  //     console.error("Error uploading file:", err);
-  //   }
-  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 p-6">
@@ -318,14 +340,14 @@ export const JobProfileForm = ({
             className="hover:bg-white/60 backdrop-blur-sm border border-gray-200"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Job Profiles
+            Back to Projects
           </Button>
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              {editData ? "Edit Job Profile" : "Create New Job Profile"}
+              {editData ? "Edit Project Lead" : "Create New Lead"}
             </h1>
             <p className="text-gray-600 mt-1">
-              Define job requirements and track candidate progress
+              Define Project requirements and track Project Progress
             </p>
           </div>
         </div>
@@ -334,18 +356,27 @@ export const JobProfileForm = ({
           <CardHeader className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
             <CardTitle className="text-2xl font-semibold flex items-center gap-2">
               <Briefcase className="h-6 w-6" />
-              Job Profile Details
+              Project Details
             </CardTitle>
           </CardHeader>
           <CardContent className="p-8">
             <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Job Information Section */}
+              {/* Project Information Section */}
               <div className="space-y-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Briefcase className="h-5 w-5 text-purple-600" />
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Job Information
-                  </h3>
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-5 w-5 text-purple-600" />
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Project Information
+                    </h3>
+                  </div>
+
+                  <Button
+                    className="bg-blue-600 text-white hover:bg-blue-700"
+                    onClick={() => navigate("/clients/create")}
+                  >
+                    Add Client
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
@@ -354,13 +385,13 @@ export const JobProfileForm = ({
                     className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                   >
                     <Briefcase className="h-4 w-4 text-purple-600" />
-                    Job Title
+                    Project Title
                   </Label>
                   <Input
                     id="title"
                     value={formData.title}
                     onChange={(e) => handleChange("title", e.target.value)}
-                    placeholder="e.g., Senior React Developer"
+                    placeholder="e.g., Food Delivery, Ecommerce"
                     className="h-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-lg"
                   />
                 </div>
@@ -416,23 +447,58 @@ export const JobProfileForm = ({
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                {/* old team section */}
+
+                {/* <div className="space-y-2">
                   <Label
-                    htmlFor="candidateName"
+                    htmlFor="teamName"
                     className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                   >
                     <User className="h-4 w-4 text-green-600" />
-                    Candidate Name
+                    Team
                   </Label>
                   <Input
-                    id="candidateName"
-                    value={formData.candidateName}
-                    onChange={(e) =>
-                      handleChange("candidateName", e.target.value)
-                    }
-                    placeholder="Enter candidate name (if selected)"
+                    id="teamName"
+                    value={formData.teamName}
+                    onChange={(e) => handleChange("teamName", e.target.value)}
+                    placeholder="Enter Team name (if selected)"
                     className="h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg"
                   />
+                </div> */}
+
+                {/* new Team Section  */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="teamName"
+                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                  >
+                    <User className="h-4 w-4 text-green-600" />
+                    Team (Press Enter to Add)
+                  </Label>
+                  <Input
+                    id="teamName"
+                    placeholder="Enter team name and press Enter"
+                    onKeyDown={handleTeamKeyDown}
+                    className="h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg"
+                  />
+
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.teamName.map((team, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm"
+                      >
+                        {team}
+                        <button
+                          type="button"
+                          onClick={() => removeTeam(team)}
+                          className="ml-2 text-green-500 hover:text-red-500 focus:outline-none"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -441,7 +507,7 @@ export const JobProfileForm = ({
                 <div className="flex items-center gap-2 mb-4">
                   <IndianRupee className="h-5 w-5 text-green-600" />
                   <h3 className="text-lg font-semibold text-gray-800">
-                    Job Requirements
+                    Project Requirements
                   </h3>
                 </div>
 
@@ -486,7 +552,6 @@ export const JobProfileForm = ({
                   </div>
                 </div>
 
-                {/* old skill type */}
                 {/* <div className="space-y-2">
                   <Label
                     htmlFor="skills"
@@ -501,7 +566,7 @@ export const JobProfileForm = ({
                     onChange={(e) => handleChange("skills", e.target.value)}
                     placeholder="e.g., React, TypeScript, Node.js, AWS"
                     className="h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg"
-                    
+                    required
                   />
                 </div> */}
 
@@ -549,7 +614,7 @@ export const JobProfileForm = ({
                     className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                   >
                     <FileText className="h-4 w-4 text-gray-600" />
-                    Job Description
+                    Project Description
                   </Label>
                   <Textarea
                     id="description"
@@ -558,7 +623,7 @@ export const JobProfileForm = ({
                       handleChange("description", e.target.value)
                     }
                     rows={4}
-                    placeholder="Detailed job description, responsibilities, and requirements..."
+                    placeholder="Detailed Project description, responsibilities, and requirements..."
                     className="border-gray-300 focus:border-gray-500 focus:ring-gray-500 rounded-lg resize-none"
                   />
                 </div>
@@ -577,7 +642,7 @@ export const JobProfileForm = ({
                   {editData ? (
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold text-gray-700">
-                        Job Status
+                        Project Status
                       </Label>
                       <Select
                         value={formData.status}
@@ -591,11 +656,11 @@ export const JobProfileForm = ({
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-gray-200 shadow-lg">
                           <SelectItem value="Active">🟢 Active</SelectItem>
-                          <SelectItem value="Profile Sent">
-                            📤 Profile Sent
+                          <SelectItem value="Lead Sent">
+                            📤 Lead Sent
                           </SelectItem>
-                          <SelectItem value="Interview Scheduled">
-                            📅 Interview Scheduled
+                          <SelectItem value="Meeting Scheduled">
+                            📅 Meeting Scheduled
                           </SelectItem>
                           <SelectItem value="On Hold">⏸️ On Hold</SelectItem>
                           <SelectItem value="Closed">✅ Closed</SelectItem>
@@ -605,7 +670,7 @@ export const JobProfileForm = ({
                   ) : (
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold text-gray-700">
-                        Job Status
+                        Project Status
                       </Label>
                       <Input
                         id="title"
@@ -617,17 +682,17 @@ export const JobProfileForm = ({
                   )}
                   <div className="space-y-2">
                     <Label
-                      htmlFor="jdFile"
+                      htmlFor="projectDescriptionFile"
                       className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                     >
                       <Upload className="h-4 w-4 text-blue-600" />
-                      Job Description File
+                      Project Description
                     </Label>
                     <div className="relative">
                       <Input
-                        id="jdFile"
+                        id="projectDescriptionFile"
                         type="file"
-                        // accept=".pdf,.doc,.docx"
+                       // accept=".pdf,.doc,.docx"
                         accept="image/*"
                         onChange={handleFileUpload}
                         className="hidden"
@@ -636,21 +701,20 @@ export const JobProfileForm = ({
                         type="button"
                         variant="outline"
                         onClick={() =>
-                          document.getElementById("jdFile")?.click()
+                          document.getElementById("projectDescriptionFile")?.click()
                         }
                         className="w-full h-12 border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 rounded-lg"
                       >
                         <Upload className="h-4 w-4 mr-2" />
-                        {"Upload JD File Image"}
+                        {
+                          "Upload Project Description Image"}
                       </Button>
-                      {/* 🌐 URL display below the button */}
-                      {formData.jdFile && (
-                        <div className="text-xs text-gray-500 truncate break-all">
-                          {formData.jdFile instanceof File
-                            ? formData.jdFile.name
-                            : formData.jdFile}
-                        </div>
-                      )}
+                                               {/* 🌐 URL display below the button */}
+   {formData.projectDescriptionFile && (
+  <div className="text-xs text-gray-500 truncate break-all">
+    {formData.projectDescriptionFile instanceof File ? formData.projectDescriptionFile.name : formData.projectDescriptionFile}
+  </div>
+)}
                     </div>
                   </div>
                 </div>
@@ -662,7 +726,7 @@ export const JobProfileForm = ({
                   type="submit"
                   className="flex-1 h-12 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  💾 {editData ? "Update Job Profile" : "Create Job Profile"}
+                  💾 {editData ? "Update Project " : "Create Project "}
                 </Button>
                 <Button
                   type="button"

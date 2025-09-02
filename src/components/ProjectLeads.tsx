@@ -1,11 +1,9 @@
-// Imports (same as your original)
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Briefcase, Clock, Users } from "lucide-react";
-import { JobProfileForm } from "./JobProfileForm";
-import { JobProfileList } from "./JobProfileList";
+
 import {
   Select,
   SelectContent,
@@ -15,29 +13,43 @@ import {
 } from "@/components/ui/select";
 import axios from "axios";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { ProjectLeadForm } from "./ProjectLeadForm";
+import { ProjectLeadList } from "./ProjectLeadsList";
 
-// Types (unchanged)
 interface PopulatedClientDetails {
   _id: string;
   name: string;
 }
 
+type ChatMessage = {
+  id: number;
+  message: string;
+  timestamp: string;
+};
+
+interface Followup {
+  id: number;
+  description: string;
+  datetime: string;
+  completed: boolean;
+}
+
 interface ActionDetails {
   inboxType?: "employee" | "candidate";
   employeeId?: string;
-  candidateName?: string | null;
+  teamName?: string[];
   markAsSend?: boolean;
   followUpDate?: string;
   lastfollowUpDate?: string;
 }
 
-interface InterviewActionDetails {
-  proceedToInterview?: boolean;
-  interviewDateTime?: string;
+interface ProjectActionDetails {
+  proceedToSendProject?: boolean;
+  MeetingDateTime?: string;
   markAsClose?: boolean;
 }
 
-interface JobProfile {
+interface ProjectProfile {
   _id: string;
   clientId: PopulatedClientDetails;
   title: string;
@@ -46,145 +58,108 @@ interface JobProfile {
   description: string;
   clientBudget: number;
   status: string;
-  jd?: string;
+  projectDescription?: string;
+  proposalDescription: string;
   actionDetails?: ActionDetails;
-  interviewActionDetails?: InterviewActionDetails;
+  projectActionDetails?: ProjectActionDetails;
+  followups?: Followup[];
+  chatMessages?: ChatMessage[];
+  conversations?: number;
   createdAt: string;
   updatedAt: string;
   __v: number;
 }
 
-export const JobProfiles = () => {
+export const ProjectLeads = () => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
-
-  // Pagination
+  const [projectProfiles, setProjectProfiles] = useState<ProjectProfile[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 10;
+  const itemsPerPage = 6;
+
   const baseURL = import.meta.env.VITE_API_URL;
-
-   useEffect(() => {
-    const fetchJobProfiles = async () => {
-      try {
-        await axios
-          .get(`${baseURL}/getAllJobProfiles?page=${currentPage}&limit=${limit}`)
-          .then((response) => {
-            console.log('This is fetch job with paginataion',response)
-            setJobProfiles(response.data.data);
-            // Assuming the API response includes total job count or total pages
-      const totalCount = response.data.totalCount; // Adjust based on your API response
-      setTotalPages(Math.ceil(totalCount / limit));
-          })
-          .catch((error) => {
-            console.log("Error to fetch jobProfilesData", error);
-          });
-      } catch (error) {
-        console.log(error);
-      }
-    };
-    fetchJobProfiles();
-  }, [currentPage]);
-
- 
-  console.log('this is the jobprofile state value',jobProfiles)
-  const addJobProfile = async () => {
+  const fetchProjectProfiles = async () => {
     try {
-      const response = await axios.get(
-        `${baseURL}/getAllJobProfiles?page=${currentPage}&limit=${limit}`
-      );
-      setJobProfiles(response.data.data || []);
-      console.log('This is the all job data after adding  ',response.data)
-      navigate("/jobs");
+      const response = await axios.get(`${baseURL}/projects`);
+      setProjectProfiles(response.data);
+      console.log('This is the response of the project fetching ',response)
     } catch (error) {
-      console.log("Error fetching updated job profiles", error);
+      console.log("Error fetching Project Profiles", error);
     }
   };
 
-  const handleEdit = (profile: JobProfile) => {
-    navigate(`/jobs/edit/${profile._id}`);
+  useEffect(() => {
+    fetchProjectProfiles();
+  }, []);
+
+  const addProjectProfile = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/projects`);
+      setProjectProfiles(response.data);
+      navigate("/projects");
+    } catch (error) {
+      console.log("Error fetching updated Project profiles", error);
+    }
   };
 
-  const handleUpdateProfiles = (updatedProfiles: JobProfile[]) => {
-    setJobProfiles(updatedProfiles);
+  const handleEdit = (profile: ProjectProfile) => {
+    navigate(`/projects/edit/${profile._id}`);
   };
 
-  // const sortedProfiles = [...jobProfiles].sort(
-  //   (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  // );
+  const handleUpdateProjects = (updatedProjects: ProjectProfile[]) => {
+    setProjectProfiles(updatedProjects);
+  };
 
-  let sortedProfiles: JobProfile[] = [];
-
-if (Array.isArray(jobProfiles)) {
-  sortedProfiles = [...jobProfiles].sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  const sortedProjects = [...projectProfiles].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
-}
 
+  const filteredProjects = sortedProjects.filter((profile) => {
+    const matchesSearch =
+      profile.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      profile?.clientId?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || profile.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
-  // const filteredProfiles = sortedProfiles.filter((profile) => {
-  //   const matchesSearch =
-  //     profile.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //     profile?.clientId?.name.toLowerCase().includes(searchTerm.toLowerCase());
-  //   const matchesStatus =
-  //     statusFilter === "all" || profile.status === statusFilter;
-  //   return matchesSearch && matchesStatus;
-  // });
+  const paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
-  // const activeProfiles = jobProfiles.filter(
-  //   (profile) => profile.status === "Active"
-  // ).length;
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
 
-  // const scheduledInterviews = jobProfiles.filter(
-  //   (profile) => profile.status === "Interview Scheduled"
-  // ).length;
+  const activeProfiles = projectProfiles.filter(
+    (profile) => profile?.status === "Active"
+  ).length;
 
-  
-  // new 
-  const filteredProfiles = Array.isArray(sortedProfiles)
-  ? sortedProfiles.filter((profile) => {
-      const matchesSearch =
-        profile.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        profile?.clientId?.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" || profile.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    })
-  : [];
+  const scheduledMeetings = projectProfiles.filter(
+    (profile) => profile.status === "Meeting Scheduled"
+  ).length;
 
-const activeProfiles = Array.isArray(jobProfiles)
-  ? jobProfiles.filter((profile) => profile.status === "Active").length
-  : 0;
+  let editData = null;
+  if (location.pathname.startsWith("/projects/edit") && params.id) {
+    editData = projectProfiles.find((p) => p._id === params.id) || null;
+  }
 
-const scheduledInterviews = Array.isArray(jobProfiles)
-  ? jobProfiles.filter((profile) => profile.status === "Interview Scheduled").length
-  : 0;
-
-  
-  const editData =
-    location.pathname.startsWith("/jobs/edit") && params.id
-      ? jobProfiles.find((p) => p._id === params.id) || null
-      : null;
-
-  if (location.pathname === "/jobs/create") {
+  if (location.pathname === "/projects/create") {
     return (
-      <JobProfileForm
-        onSave={addJobProfile}
-        onCancel={() => navigate("/jobs")}
+      <ProjectLeadForm
+        onSave={addProjectProfile}
+        onCancel={() => navigate("/projects")}
         editData={null}
       />
     );
   }
-  if (location.pathname.startsWith("/jobs/edit") && params.id) {
+  if (location.pathname.startsWith("/projects/edit") && params.id) {
     return (
-      <JobProfileForm
-        onSave={addJobProfile}
-        onCancel={() => navigate("/jobs")}
+      <ProjectLeadForm
+        onSave={addProjectProfile}
+        onCancel={() => navigate("/projects")}
         editData={editData}
       />
     );
@@ -195,34 +170,33 @@ const scheduledInterviews = Array.isArray(jobProfiles)
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-            Job Profiles
+            Project Leads
           </h1>
           <p className="text-gray-600 mt-2">
-            Manage job openings and track candidate progress
+            Lead project execution and monitor milestones.
           </p>
         </div>
         <Button
-          onClick={() => navigate("/jobs/create")}
+          onClick={() => navigate("/projects/create")}
           className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
           size="lg"
         >
           <Plus className="h-5 w-5 mr-2" />
-          Add New Job Profile
+          Add New Project
         </Button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Total Profiles */}
-        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Total Job Profiles
+                  Total Projects Leads
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {jobProfiles.length}
+                  {projectProfiles.length}
                 </p>
               </div>
               <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
@@ -232,13 +206,12 @@ const scheduledInterviews = Array.isArray(jobProfiles)
           </CardContent>
         </Card>
 
-        {/* Active Profiles */}
-        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Active Job Profiles
+                  Active Projects
                 </p>
                 <p className="text-3xl font-bold text-green-600">
                   {activeProfiles}
@@ -251,16 +224,15 @@ const scheduledInterviews = Array.isArray(jobProfiles)
           </CardContent>
         </Card>
 
-        {/* Scheduled Interviews */}
-        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Scheduled Interviews
+                  Scheduled Meeting
                 </p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {scheduledInterviews}
+                  {scheduledMeetings}
                 </p>
               </div>
               <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -275,13 +247,13 @@ const scheduledInterviews = Array.isArray(jobProfiles)
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <CardTitle className="text-xl font-semibold text-gray-800">
-              Job Profile Directory
+              Projects Leads Directory
             </CardTitle>
             <div className="flex gap-4">
               <div className="relative w-80">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search job profiles by title or client..."
+                  placeholder="Search here projects by title or client..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 h-11 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
@@ -295,10 +267,8 @@ const scheduledInterviews = Array.isArray(jobProfiles)
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Profile Sent">Profile Sent</SelectItem>
-                  <SelectItem value="Interview Scheduled">
-                    Interview Scheduled
-                  </SelectItem>
+                  <SelectItem value="Lead Sent">Lead Sent</SelectItem>
+                  <SelectItem value="Meeting Scheduled">Meeting Scheduled</SelectItem>
                   <SelectItem value="Closed">Closed</SelectItem>
                   <SelectItem value="On Hold">On Hold</SelectItem>
                 </SelectContent>
@@ -306,40 +276,30 @@ const scheduledInterviews = Array.isArray(jobProfiles)
             </div>
           </div>
         </CardHeader>
-
         <CardContent className="pt-0">
-          <JobProfileList
-            profiles={filteredProfiles}
-            onUpdate={handleUpdateProfiles}
+          <ProjectLeadList
+            projects={paginatedProjects}
+            onUpdate={handleUpdateProjects}
             onEdit={handleEdit}
           />
 
-          {/* Pagination Controls */}
           <div className="flex justify-center items-center gap-4 pt-6">
             <Button
-              className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded ${
-                currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className="text-blue-600 border-blue-500 hover:bg-blue-100"
+              variant="outline"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             >
               Prev
             </Button>
-
-            <span className="text-sm text-blue-600 font-medium">
+            <span className="text-sm text-blue-700 font-medium">
               Page {currentPage} of {totalPages}
             </span>
-
             <Button
-              className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded ${
-                currentPage === totalPages
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
-              }`}
+              className="text-blue-600 border-blue-500 hover:bg-blue-100"
+              variant="outline"
               disabled={currentPage === totalPages}
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-              }
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
             >
               Next
             </Button>

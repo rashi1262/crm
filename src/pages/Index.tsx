@@ -1,19 +1,13 @@
-
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Dashboard } from "@/components/Dashboard";
 import { ClientManagement } from "@/components/ClientManagement";
 import { JobProfiles } from "@/components/JobProfiles";
 import { Analytics } from "@/components/Analytics";
-import { Login } from "@/components/Login";
+import { Outlet } from "react-router-dom";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -30,15 +24,13 @@ const Index = () => {
     }
   };
 
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
+      <Sidebar />
       <main className="flex-1 ml-64">
-        {renderContent()}
+        {/* {renderContent()} */}
+        <Outlet />
       </main>
     </div>
   );
