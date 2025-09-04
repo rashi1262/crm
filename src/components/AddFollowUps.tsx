@@ -117,7 +117,7 @@ export default function AddFollowUps() {
             }
 
             // ✅ Delete token in backend after saving Meeting
-            await axios.get(baseURL + "/calendar/logout");
+            // await axios.get(baseURL + "/calendar/logout");
 
             fetchFollowUps();
             setIsFormOpen(false);
