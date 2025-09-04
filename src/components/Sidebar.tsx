@@ -52,7 +52,7 @@ export const Sidebar = () => {
     { id: "analytics", label: "Analytics", icon: BarChart, path: "/analytics" },
     { id: "blog", label: "Blogs", icon: Newspaper, path: "/blog" },
     { id: "allfollowup", label: "All Follow Ups", icon: Calendar, path: "/allfollowup" },
-    { id: "addfollowup", label: "Add Follow Ups", icon: Calendar, path: "/addfollowup" },
+    { id: "addMeeting", label: "Schedule Meetings", icon: Calendar, path: "/addfollowup" },
     { id: "vidhemaSupport", label: "Vidhema Support", icon: HelpCircle, path: "/support" }
   ];
 

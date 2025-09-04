@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
   const [formData, setFormData] = useState({
     name: "",
     projectManager: "",
-    contactPerson: "",
+    contactPerson: "", // now it will store _id
     email: "",
     mobileNo: "",
     company: "",
@@ -45,6 +45,23 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
     notes: "",
     totalAmount: 0,
   });
+
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const res = await axios.get("https://api.vidhema.com/getAdminUsers");
+        console.log("users: ", res.data);
+
+        // ✅ Corrected: users are inside res.data, not res.data.data
+        setAdminUsers(res.data || []);
+      } catch (err) {
+        console.error("Error fetching admin users:", err);
+      }
+    };
+    fetchAdmins();
+  }, []);
 
   // const handleCompanyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
   //   if (e.key === "Enter") {
@@ -71,8 +88,6 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
   // getting the env data of the api
 
   const baseURL = import.meta.env.VITE_API_URL;
-
- 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,7 +235,10 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
         headers: { "Content-Type": "application/json" },
       });
 
-      console.log('This is response after submit the data of client creation',response.data.data)
+      console.log(
+        "This is response after submit the data of client creation",
+        response.data.data
+      );
       const savedClientFromDb = response.data.data;
 
       // ✅ Normalize client and attach frontend defaults
@@ -318,6 +336,7 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
                     />
                   </div>
 
+                  {/* Contact Person Field */}
                   <div className="space-y-2">
                     <Label
                       htmlFor="contactPerson"
@@ -326,15 +345,40 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
                       <User className="h-4 w-4 text-blue-600" />
                       Contact Person
                     </Label>
-                    <Input
-                      id="contactPerson"
+                    <Select
                       value={formData.contactPerson}
-                      onChange={(e) =>
-                        handleChange("contactPerson", e.target.value)
+                      onValueChange={(val) =>
+                        handleChange("contactPerson", val)
                       }
-                      className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                      placeholder="Primary contact person"
-                    />
+                    >
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
+                        <SelectValue placeholder="Select a contact person" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                        {adminUsers.length > 0 ? (
+                          adminUsers.map((user) => (
+                            <SelectItem
+                              key={user._id}
+                              value={
+                                user.fullName ||
+                                user.name ||
+                                user.username ||
+                                user.email
+                              }
+                            >
+                              {user.fullName ||
+                                user.name ||
+                                user.username ||
+                                user.email}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-users" disabled>
+                            No users found
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

@@ -32,6 +32,7 @@ interface FollowUp {
     message: string;
     status: string;
     createdAt: string;
+    googleMeetLink?: string;
 }
 
 export default function AddFollowUps() {
@@ -47,6 +48,7 @@ export default function AddFollowUps() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [filterStatus, setFilterStatus] = useState("all");
+console.log(users," users state");
 
     // ✅ Form state
     const [formData, setFormData] = useState({
@@ -55,6 +57,7 @@ export default function AddFollowUps() {
         followUpDate: "",
         message: "",
         status: "pending",
+        googleMeetLink: "",
     });
 
     // ✅ Fetch follow-ups from backend
@@ -87,12 +90,21 @@ export default function AddFollowUps() {
                 setClients(res.data.data)
                 console.log("clients", res);
             });
-        axios.get(baseURL + "/users")
+        axios.get("https://api.vidhema.com/getAdminUsers")
             .then((res) => {
-                setUsers(res.data.data)
+                setUsers(res.data)
                 console.log("users: ", res);
             });
+
     }, []);
+
+
+    const getContactPersonName = (id: string | undefined) => {
+    if (!id) return "—";
+    const person = users.find((u) => u._id === id);
+    return person ? person.fullName : "—";
+};
+
 
     // ✅ Add or Update FollowUp
     const handleSubmit = async (e: React.FormEvent) => {
@@ -145,6 +157,7 @@ export default function AddFollowUps() {
             followUpDate: followUp.followUpDate.split("T")[0],
             message: followUp.message,
             status: followUp.status || "pending",
+            googleMeetLink: followUp.googleMeetLink || "",
         });
         setIsEditMode(true);
         setIsFormOpen(true);
@@ -190,7 +203,7 @@ export default function AddFollowUps() {
     const DetailItem = ({ icon: Icon, label, value, className = "" }: {
         icon: React.ComponentType<any>,
         label: string,
-        value: string | number | null | undefined,
+        value: React.ReactNode,
         className?: string
     }) => (
         <div className={`flex items-start gap-3 p-4 rounded-lg bg-gray-50 border border-gray-100 ${className}`}>
@@ -199,7 +212,7 @@ export default function AddFollowUps() {
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-700 mb-1">{label}</p>
-                <p className="text-sm text-gray-900 break-words">{value || "—"}</p>
+                <p className="text-sm text-gray-900 break-words">{value ?? "—"}</p>
             </div>
         </div>
     );
@@ -259,6 +272,7 @@ export default function AddFollowUps() {
                                         followUpDate: "",
                                         message: "",
                                         status: "pending",
+                                        googleMeetLink: "",
                                     });
                                     setIsFormOpen(true);
                                 }}
@@ -493,6 +507,23 @@ export default function AddFollowUps() {
                             />
                         </div> */}
 
+                            {/* ✅ Google Meet Link */}
+<div className="space-y-2">
+  <Label htmlFor="googleMeetLink">Google Meet Link</Label>
+  <Input
+    id="googleMeetLink"
+    type="url"
+    value={formData.googleMeetLink || ""}
+    onChange={(e) =>
+      setFormData({ ...formData, googleMeetLink: e.target.value })
+    }
+    placeholder="Paste the Google Meet link here (https://meet.google.com/...)"
+    className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm"
+  />
+</div>
+
+
+
                         {/* ✅ Message */}
                         <div className="space-y-2">
                             <Label htmlFor="message">Follow-Up Message *</Label>
@@ -555,10 +586,11 @@ export default function AddFollowUps() {
 
                                     <div className="grid gap-3 md:grid-cols-2">
                                         <DetailItem
-                                            icon={UserCheck}
-                                            label="Contact Person"
-                                            value={selectedFollowUp.contactPersonId?.fullName}
-                                        />
+  icon={UserCheck}
+  label="Contact Person"
+  value={getContactPersonName(selectedFollowUp.contactPersonId?._id)}
+/>
+
                                         {/* <DetailItem
                                             icon={Building}
                                             label="Company"
@@ -582,39 +614,60 @@ export default function AddFollowUps() {
                             </div>
 
                             {/* Follow-Up Details */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold text-gray-900 pb-2 border-b border-gray-100 flex items-center gap-2">
-                                    <MessageSquare className="w-5 h-5 text-green-600" />
-                                    Follow-Up Details
-                                </h3>
+{/* Follow-Up Details */}
+<div className="space-y-4">
+  <h3 className="text-lg font-semibold text-gray-900 pb-2 border-b border-gray-100 flex items-center gap-2">
+    <MessageSquare className="w-5 h-5 text-green-600" />
+    Follow-Up Details
+  </h3>
 
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    <DetailItem
-                                        icon={Calendar}
-                                        label="Follow-Up Date"
-                                        value={formatDate(selectedFollowUp.followUpDate)}
-                                    />
-                                    <DetailItem
-                                        icon={User}
-                                        label="Status"
-                                        value={selectedFollowUp.status?.replace('_', ' ').toUpperCase()}
-                                        className="bg-blue-50 border-blue-200"
-                                    />
-                                </div>
+  <div className="grid gap-3 md:grid-cols-2">
+    <DetailItem
+      icon={Calendar}
+      label="Follow-Up Date"
+      value={formatDate(selectedFollowUp.followUpDate)}
+    />
+    <DetailItem
+      icon={User}
+      label="Status"
+      value={selectedFollowUp.status?.replace("_", " ").toUpperCase()}
+      className="bg-blue-50 border-blue-200"
+    />
+  </div>
 
-                                <DetailItem
-                                    icon={MessageSquare}
-                                    label="Follow-Up Message"
-                                    value={selectedFollowUp.message}
-                                    className="bg-green-50 border-green-200"
-                                />
+  <DetailItem
+    icon={MessageSquare}
+    label="Follow-Up Message"
+    value={selectedFollowUp.message}
+    className="bg-green-50 border-green-200"
+  />
 
-                                <DetailItem
-                                    icon={Calendar}
-                                    label="Created At"
-                                    value={new Date(selectedFollowUp.createdAt).toLocaleString()}
-                                />
-                            </div>
+  {/* ✅ Google Meet Link */}
+  {selectedFollowUp.googleMeetLink && (
+    <DetailItem
+      icon={Calendar} // you can swap this with a Video or Link icon if you like
+      label="Google Meet Link"
+      value={
+        <a
+          href={selectedFollowUp.googleMeetLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline"
+        >
+          {selectedFollowUp.googleMeetLink}
+        </a>
+      }
+      className="bg-purple-50 border-purple-200"
+    />
+  )}
+
+  {/* <DetailItem
+    icon={Calendar}
+    label="Created At"
+    value={new Date(selectedFollowUp.createdAt).toLocaleString()}
+  /> */}
+</div>
+
                         </div>
                     )}
 

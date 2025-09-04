@@ -54,6 +54,7 @@ export const ProjectLeadForm = ({
     contactPersonName: editData?.contactPersonName || "",
     followUpDate: formatDate(editData?.actionDetails?.followUpDate || ""),
     clientBudget: editData?.clientBudget || "",
+    contactPersonId: editData?.contactPersonId || "",
     // skills: editData?.skills
     //   ? Array.isArray(editData.skills)
     //     ? editData.skills.join(", ")
@@ -124,22 +125,29 @@ export const ProjectLeadForm = ({
     }));
   };
 
-  useEffect(() => {
-    const getAllClients = async () => {
-      try {
-        const response = await axios.get(`${baseURL}/clients`);
-        setClients(response.data.data);
-        console.log(
-          "This is project getting  data through projectlead form page",
-          response.data.data
-        );
-        console.log(response.data.data, "client data");
-      } catch (error) {
-        console.log("error", error);
-      }
-    };
-    getAllClients();
-  }, []);
+const [adminUsers, setAdminUsers] = useState([]);
+
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const [clientsRes, adminUsersRes] = await Promise.all([
+        axios.get(`${baseURL}/clients`),
+        axios.get("https://api.vidhema.com/getAdminUsers"),
+      ]);
+
+      setClients(clientsRes.data.data);
+      setAdminUsers(adminUsersRes.data);
+
+      console.log("Clients:", clientsRes.data.data);
+      console.log("Admin Users:", adminUsersRes.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
+  fetchData();
+}, []);
+
 
   const navigate = useNavigate();
 
@@ -427,24 +435,39 @@ export const ProjectLeadForm = ({
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="contactPersonName"
-                      className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                    >
-                      <User className="h-4 w-4 text-blue-600" />
-                      Contact Person
-                    </Label>
-                    <Input
-                      id="contactPersonName"
-                      value={formData.contactPersonName}
-                      onChange={(e) =>
-                        handleChange("contactPersonName", e.target.value)
-                      }
-                      className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                      placeholder="Primary contact person"
-                    />
-                  </div>
+<div className="space-y-2">
+  <Label
+    htmlFor="contactPersonId"
+    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+  >
+    <User className="h-4 w-4 text-blue-600" />
+    Contact Person
+  </Label>
+
+  <Select
+    value={formData.contactPersonId}
+    onValueChange={(val) => handleChange("contactPersonId", val)} // 👉 storing _id
+  >
+    <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
+      <SelectValue placeholder="Select a contact person" />
+    </SelectTrigger>
+
+    <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+      {adminUsers.length > 0 ? (
+        adminUsers.map((user) => (
+          <SelectItem key={user._id} value={user._id}>
+            {user.fullName || user.name || user.username || user.email}
+          </SelectItem>
+        ))
+      ) : (
+        <SelectItem value="no-users" disabled>
+          No users found
+        </SelectItem>
+      )}
+    </SelectContent>
+  </Select>
+</div>
+
                 </div>
 
                 {/* old team section */}

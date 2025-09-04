@@ -89,7 +89,7 @@ interface JobProfile {
   clientBudget: number;
   status: string;
   jd?: string;
-
+  
   actionDetails?: ActionDetails;
   interviewActionDetails?: InterviewActionDetails;
   // sentProfiles?: SentProfile[];
@@ -144,6 +144,7 @@ export const AllFollowUps = () => {
     startfollowUpDate: "",
     endfollowUpDate: "",
     searchOf: "Client-Follow-Ups",
+    contactPersonId: "",
   });
 
   const [ViewContent, setViewContent] = useState<any | null>(null);
@@ -993,6 +994,23 @@ export const AllFollowUps = () => {
     filterForm.startfollowUpDate,
     filterForm.endfollowUpDate,
   ]);
+  
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+  const getAllAdminUsers = async () => {
+    try {
+      const response = await axios.get(`https://api.vidhema.com/getAdminUsers`);
+      setAdminUsers(response.data); // 👈 adminUsers state update karna hai
+      console.log("Admin Users:", response.data);
+    } catch (error) {
+      console.log("Error fetching admin users:", error);
+    }
+  };
+
+  getAllAdminUsers();
+}, []);
+
 
   const formatFollowupDate = (datetime: string, showFullDate = false) => {
     const date = new Date(datetime);
@@ -1079,7 +1097,7 @@ export const AllFollowUps = () => {
                 {filterForm.clientName ? (
                   <span>{filterForm.clientName}</span>
                 ) : (
-                  <span className="text-gray-400">Select a client</span>
+                  <span className="text-gray-400">Select a client ↓</span>
                 )}
               </SelectTrigger>
               <SelectValue placeholder="" />
@@ -1107,21 +1125,46 @@ export const AllFollowUps = () => {
             </Select>
           </div>
 
-          {/* Contact Person */}
-          <div className="flex flex-col gap-1 min-w-[200px]">
-            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <User className="h-4 w-4 text-blue-600" />
-              Contact Person
-            </Label>
-            <Input
-              value={filterForm.contactPersonName}
-              onChange={(e) =>
-                handleChange("contactPersonName", e.target.value)
-              }
-              className="h-10 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter name"
-            />
-          </div>
+{/* Contact Person */}
+<div className="flex flex-col gap-1 min-w-[220px]">
+  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+    <User className="h-4 w-4 text-blue-600" />
+  
+    Contact Person
+  </Label>
+
+  <Select
+    value={filterForm.contactPersonId}
+    onValueChange={(val) => handleChange("contactPersonId", val)}
+    
+  >
+    <SelectTrigger className="h-11 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white shadow-sm hover:shadow-md">
+      <SelectValue>
+        {adminUsers.find((u) => u._id === filterForm.contactPersonId)?.fullName ||
+          "Select contact person"}
+      </SelectValue>
+    </SelectTrigger>
+
+    <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+      {adminUsers.length > 0 ? (
+        adminUsers.map((user) => (
+          <SelectItem
+            key={user._id}
+            value={user._id}
+            className="px-3 py-2 rounded-lg cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors"
+          >
+            {user.fullName || user.name || user.username || user.email}
+          </SelectItem>
+        ))
+      ) : (
+        <SelectItem value="no-users" disabled>
+          No users found
+        </SelectItem>
+      )}
+    </SelectContent>
+  </Select>
+</div>
+
 
           {/* Start Date */}
           <div className="flex flex-col gap-1 min-w-[200px]">
