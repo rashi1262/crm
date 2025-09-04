@@ -48,7 +48,7 @@ export default function AddFollowUps() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [filterStatus, setFilterStatus] = useState("all");
-console.log(users," users state");
+    console.log(users, " users state");
 
     // ✅ Form state
     const [formData, setFormData] = useState({
@@ -60,7 +60,7 @@ console.log(users," users state");
         googleMeetLink: "",
     });
 
-    // ✅ Fetch follow-ups from backend
+    // ✅ Fetch Meetings from backend
     const fetchFollowUps = async () => {
         try {
             const res = await axios.get(baseURL + `/newfollowups`, {
@@ -100,10 +100,10 @@ console.log(users," users state");
 
 
     const getContactPersonName = (id: string | undefined) => {
-    if (!id) return "—";
-    const person = users.find((u) => u._id === id);
-    return person ? person.fullName : "—";
-};
+        if (!id) return "—";
+        const person = users.find((u) => u._id === id);
+        return person ? person.fullName : "—";
+    };
 
 
     // ✅ Add or Update FollowUp
@@ -115,6 +115,10 @@ console.log(users," users state");
             } else {
                 await axios.post(baseURL + `/newfollowups`, formData);
             }
+
+            // ✅ Delete token in backend after saving Meeting
+            await axios.get(baseURL + "/calendar/logout");
+
             fetchFollowUps();
             setIsFormOpen(false);
             setIsEditMode(false);
@@ -131,8 +135,8 @@ console.log(users," users state");
             fetchFollowUps();
 
             toast({
-                title: "Follow-up Deleted",
-                description: "The follow-up has been removed successfully.",
+                title: "Meeting Deleted",
+                description: "The Meeting has been removed successfully.",
                 variant: "default",
                 duration: 3000,
             });
@@ -141,7 +145,7 @@ console.log(users," users state");
 
             toast({
                 title: "Error",
-                description: "Failed to delete the follow-up. Please try again.",
+                description: "Failed to delete the Meeting. Please try again.",
                 variant: "destructive",
                 duration: 3000,
             });
@@ -222,10 +226,10 @@ console.log(users," users state");
             {/* Header */}
             <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Follow-Up Management
+                    Schedule Meetings Management
                 </h1>
                 <p className="text-gray-600 mt-2">
-                    Manage and track all client follow-ups and communications
+                    Manage and track all client meetings and communications
                 </p>
             </div>
 
@@ -234,7 +238,7 @@ console.log(users," users state");
                 <CardHeader className="pb-4">
                     <div className="flex items-center justify-between flex-wrap gap-4">
                         <CardTitle className="text-xl font-semibold text-gray-800">
-                            Follow-Ups
+                            Schedule Meetings
                         </CardTitle>
                         <div className="flex items-center gap-4">
                             {/* Search Box */}
@@ -262,7 +266,7 @@ console.log(users," users state");
                                 </SelectContent>
                             </Select>
 
-                            {/* Add Follow-Up Button */}
+                            {/* Add Meeting Button */}
                             <Button
                                 onClick={() => {
                                     setIsEditMode(false);
@@ -279,7 +283,7 @@ console.log(users," users state");
                                 className="h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-6"
                             >
                                 <Plus className="w-4 h-4 mr-2" />
-                                Add Follow-Up
+                                Create Meeting
                             </Button>
                         </div>
                     </div>
@@ -343,7 +347,7 @@ console.log(users," users state");
                                             colSpan={6}
                                             className="px-6 py-6 text-center text-gray-500"
                                         >
-                                            No follow-ups found
+                                            No meetings found
                                         </td>
                                     </tr>
                                 )}
@@ -379,12 +383,12 @@ console.log(users," users state");
                 <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader className="pb-6 border-b border-gray-200">
                         <DialogTitle className="text-2xl font-bold text-gray-900">
-                            {isEditMode ? "Edit Follow-Up" : "Add New Follow-Up"}
+                            {isEditMode ? "Edit Meeting" : "Add New Meeting"}
                         </DialogTitle>
                         <DialogDescription className="text-gray-600 mt-2">
                             {isEditMode
-                                ? "Update the follow-up information"
-                                : "Create a new follow-up entry"}
+                                ? "Update the Meeting information"
+                                : "Create a new Meeting entry"}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -412,7 +416,7 @@ console.log(users," users state");
 
                             {/* ✅ FollowUpDate (fix: was date) */}
                             <div className="space-y-2">
-                                <Label htmlFor="followUpDate">Follow-Up Date *</Label>
+                                <Label htmlFor="followUpDate">Meeting Date *</Label>
                                 <Input
                                     id="followUpDate"
                                     type="date"
@@ -507,33 +511,97 @@ console.log(users," users state");
                             />
                         </div> */}
 
-                            {/* ✅ Google Meet Link */}
-<div className="space-y-2">
-  <Label htmlFor="googleMeetLink">Google Meet Link</Label>
-  <Input
-    id="googleMeetLink"
-    type="url"
-    value={formData.googleMeetLink || ""}
-    onChange={(e) =>
-      setFormData({ ...formData, googleMeetLink: e.target.value })
-    }
-    placeholder="Paste the Google Meet link here (https://meet.google.com/...)"
-    className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm"
-  />
-</div>
+                        {/* ✅ Google Meet Link Field*/}
+                        <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="googleMeetLink">Meeting Link</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="googleMeetLink"
+                                    type="url"
+                                    value={formData.googleMeetLink || ""}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, googleMeetLink: e.target.value })
+                                    }
+                                    placeholder="Click 'Generate Link' to create Google Meet link"
+                                    readOnly
+                                />
+
+                                {/* ✅ Single Button for Auth + Generate */}
+                                <Button
+                                    type="button"
+                                    className="bg-green-600 hover:bg-green-700"
+                                    onClick={async () => {
+                                        try {
+                                            // Step 1: Ask backend if authenticated
+                                            const res = await fetch("http://localhost:3006/calendar/auth-url");
+                                            const data = await res.json();
+
+                                            if (data.authenticated) {
+                                                console.log("✅ Already authenticated, creating event...");
+
+                                                // Step 2: Create Google Meet Event
+                                                const response = await fetch("http://localhost:3006/calendar/create-event", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({
+                                                        summary: "Meeting Meeting",
+                                                        description: formData.message || "Client Meeting",
+                                                        start: new Date(formData.followUpDate + "T10:00:00+05:30").toISOString(),
+                                                        end: new Date(formData.followUpDate + "T10:30:00+05:30").toISOString(),
+                                                        attendees: [],
+                                                    }),
+                                                });
+
+                                                const eventData = await response.json();
+                                                if (eventData.success && eventData.meetLink) {
+                                                    setFormData({ ...formData, googleMeetLink: eventData.meetLink });
+                                                    toast({
+                                                        title: "✅ Meet Link Generated",
+                                                        description: "Google Meet link created successfully.",
+                                                        variant: "default",
+                                                        duration: 3000,
+                                                    });
+                                                } else {
+                                                    toast({
+                                                        title: "❌ Failed",
+                                                        description: "Could not generate Meet link.",
+                                                        variant: "destructive",
+                                                        duration: 3000,
+                                                    });
+                                                }
+                                            } else if (data.url) {
+                                                console.log("🔑 Redirecting to Google OAuth...");
+                                                window.location.href = data.url; // redirect to authenticate
+                                            }
+                                        } catch (err) {
+                                            console.error("Error generating Meet link:", err);
+                                            toast({
+                                                title: "❌ Error",
+                                                description: "Something went wrong while generating the Meet link. please fill date and message fields.",
+                                                variant: "destructive",
+                                                duration: 3000,
+                                            });
+                                        }
+                                    }}
+                                >
+                                    Generate Link
+                                </Button>
+                            </div>
+                        </div>
+
 
 
 
                         {/* ✅ Message */}
                         <div className="space-y-2">
-                            <Label htmlFor="message">Follow-Up Message *</Label>
+                            <Label htmlFor="message">Meeting Message *</Label>
                             <Textarea
                                 id="message"
                                 value={formData.message}
                                 onChange={(e) =>
                                     setFormData({ ...formData, message: e.target.value })
                                 }
-                                placeholder="Enter follow-up details and notes..."
+                                placeholder="Enter Meeting details and notes..."
                                 rows={4}
                                 required
                             />
@@ -549,22 +617,22 @@ console.log(users," users state");
                                 Cancel
                             </Button>
                             <Button type="submit" className="px-6 bg-blue-600 hover:bg-blue-700">
-                                {isEditMode ? "Update Follow-Up" : "Add Follow-Up"}
+                                {isEditMode ? "Update Meeting" : "Add Meeting"}
                             </Button>
                         </div>
                     </form>
                 </DialogContent>
             </Dialog>
 
-            {/* View Follow-Up Dialog */}
+            {/* View Meeting Dialog */}
             <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
                 <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader className="pb-6 border-b border-gray-200">
                         <DialogTitle className="text-2xl font-bold text-gray-900">
-                            Follow-Up Details
+                            Meeting Details
                         </DialogTitle>
                         <DialogDescription className="text-gray-600 mt-2">
-                            Complete information for this follow-up
+                            Complete information for this Meeting
                         </DialogDescription>
                     </DialogHeader>
 
@@ -586,10 +654,10 @@ console.log(users," users state");
 
                                     <div className="grid gap-3 md:grid-cols-2">
                                         <DetailItem
-  icon={UserCheck}
-  label="Contact Person"
-  value={getContactPersonName(selectedFollowUp.contactPersonId?._id)}
-/>
+                                            icon={UserCheck}
+                                            label="Contact Person"
+                                            value={getContactPersonName(selectedFollowUp.contactPersonId?._id)}
+                                        />
 
                                         {/* <DetailItem
                                             icon={Building}
@@ -613,60 +681,60 @@ console.log(users," users state");
                                 </div>
                             </div>
 
-                            {/* Follow-Up Details */}
-{/* Follow-Up Details */}
-<div className="space-y-4">
-  <h3 className="text-lg font-semibold text-gray-900 pb-2 border-b border-gray-100 flex items-center gap-2">
-    <MessageSquare className="w-5 h-5 text-green-600" />
-    Follow-Up Details
-  </h3>
+                            {/* Meeting Details */}
+                            {/* Meeting Details */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold text-gray-900 pb-2 border-b border-gray-100 flex items-center gap-2">
+                                    <MessageSquare className="w-5 h-5 text-green-600" />
+                                    Meeting Details
+                                </h3>
 
-  <div className="grid gap-3 md:grid-cols-2">
-    <DetailItem
-      icon={Calendar}
-      label="Follow-Up Date"
-      value={formatDate(selectedFollowUp.followUpDate)}
-    />
-    <DetailItem
-      icon={User}
-      label="Status"
-      value={selectedFollowUp.status?.replace("_", " ").toUpperCase()}
-      className="bg-blue-50 border-blue-200"
-    />
-  </div>
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <DetailItem
+                                        icon={Calendar}
+                                        label="Meeting Date"
+                                        value={formatDate(selectedFollowUp.followUpDate)}
+                                    />
+                                    <DetailItem
+                                        icon={User}
+                                        label="Status"
+                                        value={selectedFollowUp.status?.replace("_", " ").toUpperCase()}
+                                        className="bg-blue-50 border-blue-200"
+                                    />
+                                </div>
 
-  <DetailItem
-    icon={MessageSquare}
-    label="Follow-Up Message"
-    value={selectedFollowUp.message}
-    className="bg-green-50 border-green-200"
-  />
+                                <DetailItem
+                                    icon={MessageSquare}
+                                    label="Meeting Message"
+                                    value={selectedFollowUp.message}
+                                    className="bg-green-50 border-green-200"
+                                />
 
-  {/* ✅ Google Meet Link */}
-  {selectedFollowUp.googleMeetLink && (
-    <DetailItem
-      icon={Calendar} // you can swap this with a Video or Link icon if you like
-      label="Google Meet Link"
-      value={
-        <a
-          href={selectedFollowUp.googleMeetLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline"
-        >
-          {selectedFollowUp.googleMeetLink}
-        </a>
-      }
-      className="bg-purple-50 border-purple-200"
-    />
-  )}
+                                {/* ✅ Google Meet Link */}
+                                {selectedFollowUp.googleMeetLink && (
+                                    <DetailItem
+                                        icon={Calendar} // you can swap this with a Video or Link icon if you like
+                                        label="Google Meet Link"
+                                        value={
+                                            <a
+                                                href={selectedFollowUp.googleMeetLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 underline"
+                                            >
+                                                {selectedFollowUp.googleMeetLink}
+                                            </a>
+                                        }
+                                        className="bg-purple-50 border-purple-200"
+                                    />
+                                )}
 
-  {/* <DetailItem
+                                {/* <DetailItem
     icon={Calendar}
     label="Created At"
     value={new Date(selectedFollowUp.createdAt).toLocaleString()}
   /> */}
-</div>
+                            </div>
 
                         </div>
                     )}
@@ -686,7 +754,7 @@ console.log(users," users state");
                                 handleEdit(selectedFollowUp!);
                             }}
                         >
-                            Edit Follow-Up
+                            Edit Meeting
                         </Button>
                     </div>
                 </DialogContent>
