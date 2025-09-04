@@ -157,49 +157,50 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
     }
 
     // Validate mobile number
-    if (!formData.mobileNo.trim()) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "Mobile Number is required.",
-        variant: "destructive",
-      });
-      return;
-    } else if (!/^\d{10}$/.test(formData.mobileNo.trim())) {
-      toast({
-        title: "⚠️ Invalid Format",
-        description: "Mobile Number must be exactly 10 digits.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!formData.mobileNo.trim()) {
+    //   toast({
+    //     title: "⚠️ Missing Field",
+    //     description: "Mobile Number is required.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // } else if (!/^\d{10}$/.test(formData.mobileNo.trim())) {
+    //   toast({
+    //     title: "⚠️ Invalid Format",
+    //     description: "Mobile Number must be exactly 10 digits.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
     // Validate company name
-    if (!formData.company.trim()) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "Company Name is required.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!formData.company.trim()) {
+    //   toast({
+    //     title: "⚠️ Missing Field",
+    //     description: "Company Name is required.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
-    if (formData.totalAmount <= 0 || isNaN(formData.totalAmount)) {
-      toast({
-        title: "⚠️ Invalid Budget",
-        description: "Please enter a valid budget amount.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Validate budget
+    // if (formData.totalAmount <= 0 || isNaN(formData.totalAmount)) {
+    //   toast({
+    //     title: "⚠️ Invalid Budget",
+    //     description: "Please enter a valid budget amount.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     // Validate follow-up date
-    if (!formData.nextFollowup) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "Follow-up date is required.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!formData.nextFollowup) {
+    //   toast({
+    //     title: "⚠️ Missing Field",
+    //     description: "Follow-up date is required.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     // Validate notes/description
     if (!formData.notes.trim()) {
