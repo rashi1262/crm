@@ -47,7 +47,38 @@ export const Support = () => {
             });
 
             const backendData = response.data.data || response.data;
-            setSubmissions(backendData);
+
+            // 🔥 Normalize API fields
+            const normalizedData = backendData.map((item: any) => {
+                if (url.includes("vidhemas")) {
+                    return {
+                        _id: item._id,
+                        full_name: item.full_name,
+                        email_add: item.email_add,
+                        phone_num: item.phone_num,
+                        message: item.message,
+                        type: item.type,
+                        form_type: item.form_type,
+                        pathname: item.pathname,
+                        createdAt: item.createdAt,
+                    };
+                } else if (url.includes("iThemesSites")) {
+                    return {
+                        _id: item._id,
+                        full_name: item.name,           
+                        email_add: item.email,          
+                        phone_num: item.phone,          
+                        message: item.message,
+                        type: "iThemes Support",        
+                        form_type: item.subject,
+                        pathname: null,
+                        createdAt: item.createdAt,
+                    };
+                }
+                return item;
+            });
+
+            setSubmissions(normalizedData);
 
             if (response.data.pagination) {
                 setCurrentPage(response.data.pagination.currentPage);
@@ -85,11 +116,11 @@ export const Support = () => {
         });
     };
 
-    const DetailItem = ({ icon: Icon, label, value, className = "" }: { 
-        icon: React.ComponentType<any>, 
-        label: string, 
+    const DetailItem = ({ icon: Icon, label, value, className = "" }: {
+        icon: React.ComponentType<any>,
+        label: string,
         value: string | number | null | undefined,
-        className?: string 
+        className?: string
     }) => (
         <div className={`flex items-start gap-3 p-4 rounded-lg bg-gray-50 border border-gray-100 ${className}`}>
             <div className="flex-shrink-0 w-5 h-5 text-gray-600 mt-0.5">
@@ -156,6 +187,7 @@ export const Support = () => {
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gradient-to-r from-blue-600 to-purple-600 text-white sticky top-0 z-10">
                                 <tr>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Sr. No.</th>
                                     <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
                                     <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
                                     <th className="px-6 py-3 text-left text-sm font-semibold">Phone</th>
@@ -166,8 +198,11 @@ export const Support = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-100 bg-white">
                                 {filteredData.length > 0 ? (
-                                    filteredData.map((s) => (
+                                    filteredData.map((s, index) => (
                                         <tr key={s._id} className="hover:bg-blue-50/50 transition">
+                                            <td className="px-6 py-4 text-sm text-gray-700 font-medium">
+                                                {(currentPage - 1) * itemsPerPage + (index + 1)}
+                                            </td>
                                             <td className="px-6 py-4 text-sm text-gray-700 font-medium">
                                                 {s.full_name || "NA"}
                                             </td>
@@ -255,23 +290,23 @@ export const Support = () => {
                                     <User className="w-5 h-5 text-blue-600" />
                                     Personal Information
                                 </h3>
-                                
+
                                 <div className="space-y-3">
-                                    <DetailItem 
-                                        icon={User} 
-                                        label="Full Name" 
+                                    <DetailItem
+                                        icon={User}
+                                        label="Full Name"
                                         value={selectedSubmission.full_name}
                                     />
-                                    
+
                                     <div className="grid gap-3 md:grid-cols-2">
-                                        <DetailItem 
-                                            icon={Mail} 
-                                            label="Email Address" 
+                                        <DetailItem
+                                            icon={Mail}
+                                            label="Email Address"
                                             value={selectedSubmission.email_add}
                                         />
-                                        <DetailItem 
-                                            icon={Phone} 
-                                            label="Phone Number" 
+                                        <DetailItem
+                                            icon={Phone}
+                                            label="Phone Number"
                                             value={selectedSubmission.phone_num}
                                         />
                                     </div>
@@ -285,9 +320,9 @@ export const Support = () => {
                                         <MessageSquare className="w-5 h-5 text-green-600" />
                                         Message
                                     </h3>
-                                    <DetailItem 
-                                        icon={MessageSquare} 
-                                        label="Message Content" 
+                                    <DetailItem
+                                        icon={MessageSquare}
+                                        label="Message Content"
                                         value={selectedSubmission.message}
                                         className="bg-blue-50 border-blue-200"
                                     />
@@ -300,24 +335,24 @@ export const Support = () => {
                                     <FileText className="w-5 h-5 text-purple-600" />
                                     Form Information
                                 </h3>
-                                
+
                                 <div className="grid gap-3 md:grid-cols-2">
-                                    <DetailItem 
-                                        icon={FileText} 
-                                        label="Form Type" 
+                                    <DetailItem
+                                        icon={FileText}
+                                        label="Form Type"
                                         value={selectedSubmission.form_type}
                                     />
-                                    <DetailItem 
-                                        icon={Tag} 
-                                        label="Submission Type" 
+                                    <DetailItem
+                                        icon={Tag}
+                                        label="Submission Type"
                                         value={selectedSubmission.type}
                                     />
                                 </div>
-                                
+
                                 {selectedSubmission.pathname && (
-                                    <DetailItem 
-                                        icon={Globe} 
-                                        label="Page Path" 
+                                    <DetailItem
+                                        icon={Globe}
+                                        label="Page Path"
                                         value={selectedSubmission.pathname}
                                     />
                                 )}
@@ -329,9 +364,9 @@ export const Support = () => {
                                     <Calendar className="w-5 h-5 text-orange-600" />
                                     Submission Details
                                 </h3>
-                                <DetailItem 
-                                    icon={Calendar} 
-                                    label="Created At" 
+                                <DetailItem
+                                    icon={Calendar}
+                                    label="Created At"
                                     value={formatDate(selectedSubmission.createdAt)}
                                     className="bg-green-50 border-green-200"
                                 />
