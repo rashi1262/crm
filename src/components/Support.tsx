@@ -134,7 +134,7 @@ export const Support = () => {
     );
 
     return (
-        <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6">
+        <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6 max-w-[80vw] mx-auto">
             {/* Header */}
             <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
