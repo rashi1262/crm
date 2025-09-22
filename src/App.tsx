@@ -14,7 +14,7 @@ import { ClientManagement } from "./components/ClientManagement";
 import { JobProfileForm } from "./components/JobProfileForm";
 import { JobProfiles } from "./components/JobProfiles";
 import { Analytics } from "./components/Analytics";
-import { Dashboard } from "./components/Dashboard";
+import { Dashboard } from "./components/dashboard/Dashboard";
 import { ProjectLeads } from "./components/ProjectLeads";
 import { ProjectLeadForm } from "./components/ProjectLeadForm";
 import {AllFollowUps} from "./components/AllFollowUps";

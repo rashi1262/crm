@@ -644,7 +644,8 @@ export const ClientList = ({
                       Next Follow-up
                     </p>
                     <p className="font-medium text-blue-600">
-                      {new Date(client.nextFollowup).toLocaleDateString()}
+                      {/* {new Date(client.nextFollowup).toLocaleDateString()} */}
+                      {client.nextFollowup  ? new Date(client.nextFollowup).toLocaleDateString() : "N/A"}
                     </p>
                   </div>
                 </div>

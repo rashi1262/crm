@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { Dashboard } from "@/components/Dashboard";
+import { Dashboard } from "@/components/dashboard/Dashboard";
 import { ClientManagement } from "@/components/ClientManagement";
 import { JobProfiles } from "@/components/JobProfiles";
 import { Analytics } from "@/components/Analytics";
