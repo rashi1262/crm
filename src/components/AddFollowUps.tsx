@@ -154,11 +154,14 @@ export default function AddFollowUps() {
 
     // ✅ Edit (prefill form)
     const handleEdit = (followUp: FollowUp) => {
+        const date = new Date(followUp.followUpDate);
+        const formattedDate = date.toISOString().slice(0, 16);
+
         setSelectedFollowUp(followUp);
         setFormData({
             clientId: followUp.clientId?._id || "",
             contactPersonId: followUp.contactPersonId?._id || "",
-            followUpDate: followUp.followUpDate.split("T")[0],
+            followUpDate: followUp.followUpDate ? formattedDate : "",
             message: followUp.message,
             status: followUp.status || "pending",
             googleMeetLink: followUp.googleMeetLink || "",
@@ -182,10 +185,12 @@ export default function AddFollowUps() {
     );
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
+        return new Date(dateString).toLocaleDateString('en-IN', {
             year: 'numeric',
             month: 'short',
-            day: 'numeric'
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
         });
     };
 
@@ -225,7 +230,7 @@ export default function AddFollowUps() {
         <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6">
             {/* Header */}
             <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-4xl font-bold pb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                     Schedule Meetings Management
                 </h1>
                 <p className="text-gray-600 mt-2">
@@ -419,7 +424,7 @@ export default function AddFollowUps() {
                                 <Label htmlFor="followUpDate">Meeting Date *</Label>
                                 <Input
                                     id="followUpDate"
-                                    type="date"
+                                    type="datetime-local"
                                     value={formData.followUpDate}
                                     onChange={(e) =>
                                         setFormData({ ...formData, followUpDate: e.target.value })
@@ -546,8 +551,8 @@ export default function AddFollowUps() {
                                                     body: JSON.stringify({
                                                         summary: "Meeting Meeting",
                                                         description: formData.message || "Client Meeting",
-                                                        start: new Date(formData.followUpDate + "T10:00:00+05:30").toISOString(),
-                                                        end: new Date(formData.followUpDate + "T10:30:00+05:30").toISOString(),
+                                                        start: new Date(formData.followUpDate).toISOString(),
+                                                        end: new Date(formData.followUpDate).toISOString(),
                                                         attendees: [],
                                                     }),
                                                 });

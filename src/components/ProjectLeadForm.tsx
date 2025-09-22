@@ -41,11 +41,21 @@ export const ProjectLeadForm = ({
   editData,
 }: ProjectProfileFormProps) => {
   const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
+  // const formatDate = (dateStr: string) => {
+  //   if (!dateStr) return "";
+  //   const d = new Date(dateStr);
+  //   if (isNaN(d.getTime())) return "";
+  //   return d.toISOString().slice(0, 10);
+  // };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return "";
-    return d.toISOString().slice(0, 10);
+
+    // The toISOString() method returns a string in the format "YYYY-MM-DDTHH:mm:ss.sssZ"
+    // We need to slice it to "YYYY-MM-DDTHH:mm" to be compatible with datetime-local
+    return d.toISOString().slice(0, 16);
   };
 
   const [formData, setFormData] = useState({
@@ -54,7 +64,7 @@ export const ProjectLeadForm = ({
     contactPersonName: editData?.contactPersonName || "",
     followUpDate: formatDate(editData?.actionDetails?.followUpDate || ""),
     clientBudget: editData?.clientBudget || "",
-    contactPersonId: editData?.contactPersonId || "",
+    contactPersonId: editData?.actionDetails?.employeeId || "",
     // skills: editData?.skills
     //   ? Array.isArray(editData.skills)
     //     ? editData.skills.join(", ")
@@ -125,29 +135,61 @@ export const ProjectLeadForm = ({
     }));
   };
 
-const [adminUsers, setAdminUsers] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
 
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      const [clientsRes, adminUsersRes] = await Promise.all([
-        axios.get(`${baseURL}/clients`),
-        axios.get("https://api.vidhema.com/getAdminUsers"),
-      ]);
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     try {
+  //       const [clientsRes, adminUsersRes] = await Promise.all([
+  //         axios.get(`${baseURL}/clients`),
+  //         axios.get("https://api.vidhema.com/getAdminUsers"),
+  //       ]);
 
-      setClients(clientsRes.data.data);
-      setAdminUsers(adminUsersRes.data);
+  //       setClients(clientsRes.data.data);
+  //       setAdminUsers(adminUsersRes.data);
 
-      console.log("Clients:", clientsRes.data.data);
-      console.log("Admin Users:", adminUsersRes.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
+  //       console.log("Clients:", clientsRes.data.data);
+  //       console.log("Admin Users:", adminUsersRes.data);
+  //     } catch (error) {
+  //       console.error("Error fetching data:", error);
+  //     }
+  //   };
 
-  fetchData();
-}, []);
+  //   fetchData();
+  // }, []);
 
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [clientsRes, adminUsersRes] = await Promise.all([
+          axios.get(`${baseURL}/clients`),
+          axios.get("https://api.vidhema.com/getAdminUsers"),
+        ]);
+
+        setClients(clientsRes.data.data);
+        const fetchedAdminUsers = adminUsersRes.data;
+        setAdminUsers(fetchedAdminUsers);
+
+        if (editData && editData.actionDetails?.employeeId) {
+          const contactPerson = fetchedAdminUsers.find(
+            (user) => user._id === editData.actionDetails.employeeId
+          );
+          if (contactPerson) {
+            setFormData((prev) => ({
+              ...prev,
+              contactPersonId: editData.actionDetails.employeeId,
+              contactPersonName: contactPerson.fullName || contactPerson.name || contactPerson.username,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, [editData]);
 
   const navigate = useNavigate();
 
@@ -220,17 +262,16 @@ useEffect(() => {
       return;
     }
 
-     let projectDescribeImageUrl=typeof formData.projectDescriptionFile==='string' ? formData.projectDescriptionFile : "";
-    
-        if(formData.projectDescriptionFile instanceof File)
-        {
-           const uploadData=new FormData()
-           uploadData.append("image", formData.projectDescriptionFile); 
-           try {
+    let projectDescribeImageUrl = typeof formData.projectDescriptionFile === 'string' ? formData.projectDescriptionFile : "";
+
+    if (formData.projectDescriptionFile instanceof File) {
+      const uploadData = new FormData()
+      uploadData.append("image", formData.projectDescriptionFile);
+      try {
         const res = await axios.post(`${baseURL}/upload`, uploadData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        console.log('Response of image upload',res.data)
+        console.log('Response of image upload', res.data)
         projectDescribeImageUrl = res.data.imageUrl;
       } catch (uploadErr) {
         console.error("Upload failed:", uploadErr);
@@ -241,15 +282,15 @@ useEffect(() => {
         });
         return;
       }
-        }
-    
-      // console.log("Raw Followup date creation of Project (local):",formData.followUpDate);
-      // console.log("Udate followupdate in creation of Project", formData.followUpDate);
+    }
 
-      // // convert localdateandtime to utc for consistency db
-      // const utcDateStr=new Date(formData.followUpDate).toISOString()
-      // // converted utcDateStr
-      //  console.log("Converted to UTC in Project  creation :", utcDateStr);
+    // console.log("Raw Followup date creation of Project (local):",formData.followUpDate);
+    // console.log("Udate followupdate in creation of Project", formData.followUpDate);
+
+    // // convert localdateandtime to utc for consistency db
+    // const utcDateStr=new Date(formData.followUpDate).toISOString()
+    // // converted utcDateStr
+    //  console.log("Converted to UTC in Project  creation :", utcDateStr);
 
     const payload = {
       clientId: selectedClient._id,
@@ -263,9 +304,10 @@ useEffect(() => {
       // clientBudget: Number(formData.clientBudget.replace(/[^0-9.-]+/g, "")),
       clientBudget: Number(formData.clientBudget),
       status: formData.status,
-      projectDescription:projectDescribeImageUrl,
+      projectDescription: projectDescribeImageUrl,
       actionDetails: {
         teamName: formData.teamName,
+        employeeId: formData.contactPersonId,
         followUpDate: formData.followUpDate,
         // followUpDate: utcDateStr,
         lastfollowUpDate: formData.followUpDate || new Date().toISOString(), // Safe fallback
@@ -329,6 +371,17 @@ useEffect(() => {
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleContactPersonChange = (selectedId) => {
+    const selectedUser = adminUsers.find(user => user._id === selectedId);
+    if (selectedUser) {
+      setFormData(prev => ({
+        ...prev,
+        contactPersonId: selectedId, // Set the ID
+        contactPersonName: selectedUser.fullName || selectedUser.name || selectedUser.username, // Set the name
+      }));
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -435,38 +488,38 @@ useEffect(() => {
                     </Select>
                   </div>
 
-<div className="space-y-2">
-  <Label
-    htmlFor="contactPersonId"
-    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-  >
-    <User className="h-4 w-4 text-blue-600" />
-    Contact Person
-  </Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="contactPersonId"
+                      className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                    >
+                      <User className="h-4 w-4 text-blue-600" />
+                      Contact Person
+                    </Label>
 
-  <Select
-    value={formData.contactPersonId}
-    onValueChange={(val) => handleChange("contactPersonId", val)} // 👉 storing _id
-  >
-    <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
-      <SelectValue placeholder="Select a contact person" />
-    </SelectTrigger>
+                    <Select
+                      value={formData.contactPersonId}
+                      onValueChange={handleContactPersonChange} // 👉 storing _id
+                    >
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
+                        <SelectValue placeholder="Select a contact person" />
+                      </SelectTrigger>
 
-    <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
-      {adminUsers.length > 0 ? (
-        adminUsers.map((user) => (
-          <SelectItem key={user._id} value={user._id}>
-            {user.fullName || user.name || user.username || user.email}
-          </SelectItem>
-        ))
-      ) : (
-        <SelectItem value="no-users" disabled>
-          No users found
-        </SelectItem>
-      )}
-    </SelectContent>
-  </Select>
-</div>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                        {adminUsers.length > 0 ? (
+                          adminUsers.map((user) => (
+                            <SelectItem key={user._id} value={user._id}>
+                              {user.fullName || user.name || user.username || user.email}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-users" disabled>
+                            No users found
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                 </div>
 
@@ -545,7 +598,7 @@ useEffect(() => {
                     </Label>
                     <Input
                       id="followUpDate"
-                      type="date"
+                      type="datetime-local"
                       value={formData.followUpDate}
                       onChange={(e) =>
                         handleChange("followUpDate", e.target.value)
@@ -715,7 +768,7 @@ useEffect(() => {
                       <Input
                         id="projectDescriptionFile"
                         type="file"
-                       // accept=".pdf,.doc,.docx"
+                        // accept=".pdf,.doc,.docx"
                         accept="image/*"
                         onChange={handleFileUpload}
                         className="hidden"
@@ -732,12 +785,12 @@ useEffect(() => {
                         {
                           "Upload Project Description Image"}
                       </Button>
-                                               {/* 🌐 URL display below the button */}
-   {formData.projectDescriptionFile && (
-  <div className="text-xs text-gray-500 truncate break-all">
-    {formData.projectDescriptionFile instanceof File ? formData.projectDescriptionFile.name : formData.projectDescriptionFile}
-  </div>
-)}
+                      {/* 🌐 URL display below the button */}
+                      {formData.projectDescriptionFile && (
+                        <div className="text-xs text-gray-500 truncate break-all">
+                          {formData.projectDescriptionFile instanceof File ? formData.projectDescriptionFile.name : formData.projectDescriptionFile}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
