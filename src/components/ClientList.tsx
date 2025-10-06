@@ -7,6 +7,7 @@ import {
   DollarSign,
   MessageCircle,
   CreditCard,
+  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -61,17 +62,20 @@ interface Client {
   source: string;
   username: string;
   profileImage: string | null;
+  notes: string;
 }
 
 interface ClientListProps {
   clients: Client[];
   onUpdate: (clients: Client[]) => void;
+  onEdit: (clients: Client) => void;
   refetchClients: () => void; // Add this line
 }
 
 export const ClientList = ({
   clients,
   onUpdate,
+  onEdit,
   refetchClients,
 }: ClientListProps) => {
   // const [editingClient, setEditingClient] = useState<number | null>(null);
@@ -92,6 +96,7 @@ export const ClientList = ({
   const [followUps, setFollowUps] = useState<string | null>(null); // store client.id
   const [chatUps, setChatUps] = useState<string | null>(null); //store the client.id for the chat purpose
   const [activeTab, setActiveTab] = useState<"new" | "history">("new");
+  const [confirmCloseClientId, setConfirmCloseClientId] = useState<string | null>(null);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -127,7 +132,7 @@ export const ClientList = ({
 
   const baseURL = import.meta.env.VITE_API_URL;
 
- 
+
 
   const updateClient = async (id: string, updates: Partial<Client>) => {
     try {
@@ -288,7 +293,7 @@ export const ClientList = ({
       // const nextFollowup = sortedFollowups[0]?.datetime || null;
       // const lastFollowup =
       //   sortedFollowups[1]?.datetime || sortedFollowups[0]?.datetime || null;
-      
+
       //   console.log('the sorted order of followup is',sortedFollowups)
       //   console.log('The last followup and next followup is ',lastFollowup,nextFollowup)
 
@@ -300,34 +305,34 @@ export const ClientList = ({
 
       // new 
       // ✅ Merge new followups (from updates) with existing ones
-    const incomingFollowups = updates.followups || [];
-    const allFollowups = [...serverFollowups, ...incomingFollowups];
+      const incomingFollowups = updates.followups || [];
+      const allFollowups = [...serverFollowups, ...incomingFollowups];
 
-    // ✅ Sort by datetime ascending (earliest to latest)
-    const sortedFollowups = [...allFollowups].sort(
-      (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
-    );
+      // ✅ Sort by datetime ascending (earliest to latest)
+      const sortedFollowups = [...allFollowups].sort(
+        (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+      );
 
-    const now = new Date();
+      const now = new Date();
 
-    // ✅ Get upcoming and past followups
-    const futureFollowups = sortedFollowups.filter(
-      (f) => new Date(f.datetime) > now
-    );
-    const pastFollowups = sortedFollowups.filter(
-      (f) => new Date(f.datetime) <= now
-    );
+      // ✅ Get upcoming and past followups
+      const futureFollowups = sortedFollowups.filter(
+        (f) => new Date(f.datetime) > now
+      );
+      const pastFollowups = sortedFollowups.filter(
+        (f) => new Date(f.datetime) <= now
+      );
 
-    // ✅ Extract next and last followup
-    const nextFollowup = futureFollowups[0]?.datetime || null;
-   const lastFollowup = pastFollowups[pastFollowups.length - 1]?.datetime || null;
+      // ✅ Extract next and last followup
+      const nextFollowup = futureFollowups[0]?.datetime || null;
+      const lastFollowup = pastFollowups[pastFollowups.length - 1]?.datetime || null;
 
-    const updatePayload = {
-      ...updates,
-      followups: allFollowups, // Ensure the full updated list is sent
-      nextFollowup,
-      lastFollowup,
-    };
+      const updatePayload = {
+        ...updates,
+        followups: allFollowups, // Ensure the full updated list is sent
+        nextFollowup,
+        lastFollowup,
+      };
 
       console.log("Updating client with ID:", id);
       console.log("this is the updateclient data", updatePayload);
@@ -538,6 +543,22 @@ export const ClientList = ({
     setPaymentData({ status: "", totalAmount: 0, paidAmount: 0 });
   };
 
+  const closeClient = async (id: string) => {
+    try {
+      await axios.delete(
+        `${baseURL}/clients/delete/${id}`,
+      );
+
+      const response = await axios.get(
+        `${baseURL}/clients`,
+      );
+      onUpdate(response.data.data); // Update UI with fresh data
+      console.log("Job status updated to Closed", response.data.data);
+    } catch (error) {
+      console.error("Error updating job status:", error);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -645,7 +666,7 @@ export const ClientList = ({
                     </p>
                     <p className="font-medium text-blue-600">
                       {/* {new Date(client.nextFollowup).toLocaleDateString()} */}
-                      {client.nextFollowup  ? new Date(client.nextFollowup).toLocaleDateString() : "N/A"}
+                      {client.nextFollowup ? new Date(client.nextFollowup).toLocaleDateString() : "N/A"}
                     </p>
                   </div>
                 </div>
@@ -671,9 +692,8 @@ export const ClientList = ({
                         <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{
-                            width: `${
-                              (client.paidAmount / client.totalAmount) * 100
-                            }%`,
+                            width: `${(client.paidAmount / client.totalAmount) * 100
+                              }%`,
                           }}
                         ></div>
                       </div>
@@ -683,137 +703,14 @@ export const ClientList = ({
 
               <div className="flex flex-col gap-3 ml-6">
                 <div className="flex gap-2">
-                  <Dialog
-                    open={editUps === client.id}
-                    onOpenChange={(open) => setEditUps(open ? client.id : null)}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onEdit(client)}
                   >
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                        onClick={() => {
-                          setEditUps(client.id);
-                          setEditingClient(client.id);
-                          setEditFormData(client);
-                        }}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-gray-900">
-                          Edit Client Details
-                        </DialogTitle>
-                        <DialogDescription>
-                          Make changes to the clients information below.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">
-                            Client Name
-                          </Label>
-                          <Input
-                            value={editFormData.name || ""}
-                            onChange={(e) =>
-                              setEditFormData((prev) => ({
-                                ...prev,
-                                name: e.target.value,
-                              }))
-                            }
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">
-                            Contact Person
-                          </Label>
-                          <Input
-                            value={editFormData.contactPerson || ""}
-                            onChange={(e) =>
-                              setEditFormData((prev) => ({
-                                ...prev,
-                                contactPerson: e.target.value,
-                              }))
-                            }
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">
-                            Email
-                          </Label>
-                          <Input
-                            value={editFormData.email || ""}
-                            onChange={(e) =>
-                              setEditFormData((prev) => ({
-                                ...prev,
-                                email: e.target.value,
-                              }))
-                            }
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">
-                            Phone
-                          </Label>
-                          <Input
-                            // value={
-                            //   editFormData.phone || editFormData.mobileNo || ""
-                            // }
-                            value={editFormData.mobileNo || ""}
-                            onChange={(e) =>
-                              setEditFormData((prev) => ({
-                                ...prev,
-                                // phone: e.target.value,
-                                mobileNo: e.target.value,
-                              }))
-                            }
-                            className="mt-1"
-                          />
-                        </div>
-                        {/* adding the status filed */}
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">
-                            Status
-                          </Label>
-
-                          <Select
-                            value={editFormData.status}
-                            onValueChange={(value) =>
-                              setEditFormData((prev) => ({
-                                ...prev,
-                                status: value,
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="w-full mt-1">
-                              <SelectValue placeholder="Select payment status" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                              <SelectItem value="Active">✅ Active</SelectItem>
-                              <SelectItem value="Pending">
-                                ⏳ Pending
-                              </SelectItem>
-                              <SelectItem value="Inactive">
-                                ❌ Inactive
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button
-                          onClick={saveEdit}
-                          className="w-full bg-blue-600 hover:bg-blue-700"
-                        >
-                          Save Changes
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
 
                   {/* old dialog or followupd data  */}
 
@@ -1021,6 +918,54 @@ export const ClientList = ({
                       )}
                     </DialogContent>
                   </Dialog>
+
+                  {/* Delete client dialog box */}
+                  <Dialog
+                    open={confirmCloseClientId === client.id}
+                    onOpenChange={(open) =>
+                      setConfirmCloseClientId(open ? client.id : null)
+                    }
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setConfirmCloseClientId(client.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Close
+                      </Button>
+                    </DialogTrigger>
+
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Confirm Close</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 text-sm text-gray-600">
+                        Are you sure you want to remove this Client? This action
+                        cannot be undone.
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => setConfirmCloseClientId(null)}
+                        >
+                          ❌ Cancel
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            closeClient(client.id);
+                            setConfirmCloseClientId(null);
+                          }}
+                        >
+                          ✅ Yes, Close
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
 
                 <div className="flex gap-2">
@@ -1226,9 +1171,19 @@ export const ClientList = ({
                 </div>
               </div>
             </div>
+            {client?.notes && (
+              <div className="border-t pt-4">
+                <p className="font-medium text-gray-900 mb-2">Notes & Comments</p>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {client?.notes}
+                </p>
+              </div>
+            )}
           </div>
         );
       })}
+
+
     </div>
   );
 };
