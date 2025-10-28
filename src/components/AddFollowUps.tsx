@@ -96,8 +96,27 @@ export default function AddFollowUps() {
                 console.log("users: ", res);
             });
 
-    }, []);
+        const urlParams = new URLSearchParams(window.location.search);
+        const access_token = urlParams.get("access_token");
+        const refresh_token = urlParams.get("refresh_token");
 
+        if (access_token) {
+            localStorage.setItem("google_access_token", access_token);
+            if (refresh_token) {
+                localStorage.setItem("google_refresh_token", refresh_token);
+            }
+
+            // Remove tokens from URL to keep it clean
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            toast({
+                title: "✅ Google Auth Successful",
+                description: "You can now create a Google Meet link.",
+                variant: "default",
+                duration: 3000,
+            });
+        }
+    }, []);
 
     const getContactPersonName = (id: string | undefined) => {
         if (!id) return "—";
@@ -240,33 +259,6 @@ export default function AddFollowUps() {
             try {
                 const res = await fetch(`${baseURL}/calendar/auth-url`);
                 const data = await res.json();
-
-                // Step 2: Check if redirected back with tokens in URL
-                const urlParams = new URLSearchParams(window.location.search);
-                const access_token = urlParams.get("access_token");
-                const refresh_token = urlParams.get("refresh_token");
-
-                if (access_token) {
-                    // ✅ Save tokens in localStorage
-                    localStorage.setItem("google_access_token", access_token);
-                    if (refresh_token) localStorage.setItem("google_refresh_token", refresh_token);
-
-                    // ✅ Remove tokens from URL to clean up
-                    window.history.replaceState({}, document.title, window.location.pathname);
-
-                    // Open the form after successful authentication
-                    setIsEditMode(false);
-                    setFormData({
-                        clientId: "",
-                        contactPersonId: "",
-                        followUpDate: "",
-                        message: "",
-                        status: "pending",
-                        googleMeetLink: "",
-                    });
-                    setIsFormOpen(true);
-                    return; // stop execution
-                }
 
                 if (data.url) {
                     window.location.href = data.url; // Redirect to Google OAuth
