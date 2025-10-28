@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "./ui/input";
+const baseURL = import.meta.env.VITE_API_URL;
 
 interface Client {
   mobileNo: string;
@@ -307,8 +308,7 @@ export const AllFollowUps = () => {
 
     return null;
   };
-  const baseURL = import.meta.env.VITE_API_URL;
-
+  
   const getJobsData = async () => {
     try {
       const response = await axios.get(
@@ -1000,7 +1000,7 @@ export const AllFollowUps = () => {
   useEffect(() => {
   const getAllAdminUsers = async () => {
     try {
-      const response = await axios.get(`https://api.vidhema.com/getAdminUsers`);
+      const response = await axios.get(`${baseURL}/getAdminUsers`);
       setAdminUsers(response.data); // 👈 adminUsers state update karna hai
       console.log("Admin Users:", response.data);
     } catch (error) {

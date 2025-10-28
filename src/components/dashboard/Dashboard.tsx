@@ -27,6 +27,7 @@ export interface Client {
   paidAmount?: number;
   conversations: number;
   chatMessages: { id: number; message: string; timestamp: string }[];
+  actionDetails?: ActionDetails;
   followups: {
     id: number;
     description: string;
@@ -48,6 +49,7 @@ export interface ActionDetails {
   candidateName?: string | null;
   markAsSend?: boolean;
   followUpDate?: string;
+  lastfollowUpDate?: string;
 }
 
 export interface InterviewActionDetails {
@@ -168,47 +170,81 @@ export const Dashboard = () => {
   const [newupcomingFollowupsProjects, setUpcomingFollowupsProjects] = useState<
     { project: ProjectProfile; followup: any }[]
   >([]);
-  const [meetingsData, setMeetingsData] = useState<{ name: string; datetime: string }[]>([]);
+  const [meetingsFollowupsData, setMeetingsFollowupsData] = useState<{ name: string; datetime: string }[]>([]);
   const [latestMeeting, setLatestMeeting] = useState<NewFollowup | null>(null);
   // Reverted back to separate state variables
   const [clientFollowupsData, setClientFollowupsData] = useState<{ name: string; datetime: string }[]>([]);
+  const [jobFollowupsData, setJobFollowupsData] = useState<{ name: string; datetime: string }[]>([]);
+  const [projectFollowupsData, setProjectFollowupsData] = useState<{ name: string; datetime: string }[]>([]);
 
   const baseURL = import.meta.env.VITE_API_URL;
 
-  const getTopFollowupDate = (project: ProjectProfile): string | null => {
+  // ✅ For Project
+  const getTopFollowupDateForProject = (project: ProjectProfile): string | null => {
     const now = Date.now();
     const candidates: number[] = [];
+
+    // Collect future followups (not completed)
     if (Array.isArray(project.followups)) {
       project.followups.forEach((fu) => {
         const time = new Date(fu.datetime).getTime();
-        if (time > now) {
+        if (!fu.completed && time > now) {
           candidates.push(time);
         }
       });
     }
+
+    // Include actionDetails follow-up if valid
     const actionFollowupTime = project.actionDetails?.followUpDate
       ? new Date(project.actionDetails.followUpDate).getTime()
       : null;
+
     if (actionFollowupTime && actionFollowupTime > now) {
       candidates.push(actionFollowupTime);
     }
+
+    if (candidates.length === 0) return null;
+
+    const soonest = Math.min(...candidates);
+    return new Date(soonest).toISOString();
+  };
+
+  // ✅ For Client
+  const getTopFollowupDateForClient = (client: Client): string | null => {
+    const now = Date.now();
+    const candidates: number[] = [];
+
+    // 1️⃣ Add followups[] dates if valid and upcoming
+    if (Array.isArray(client.followups)) {
+      client.followups.forEach((fu) => {
+        const time = new Date(fu.datetime).getTime();
+        if (!fu.completed && time > now) {
+          candidates.push(time);
+        }
+      });
+    }
+
+    // 2️⃣ Add actionDetails.followUpDate if available and future
+    const actionFollowupTime = client.actionDetails?.followUpDate
+      ? new Date(client.actionDetails.followUpDate).getTime()
+      : null;
+
+    if (actionFollowupTime && actionFollowupTime > now) {
+      candidates.push(actionFollowupTime);
+    }
+
+    // 3️⃣ Return soonest future followup
     if (candidates.length === 0) return null;
     const soonest = Math.min(...candidates);
     return new Date(soonest).toISOString();
   };
 
-  const getTopFollowupFromClient = (client: Client): Followup | null => {
-    const now = Date.now();
-    return (
-      (client.followups || [])
-        .filter((f) => !f.completed && new Date(f.datetime).getTime() > now)
-        .sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())[0] || null
-    );
-  };
 
+  // ✅ For Job
   const getTopFollowupDateForJob = (job: JobProfile): string | null => {
     const now = Date.now();
     const candidates: number[] = [];
+
     if (Array.isArray(job.followups)) {
       job.followups.forEach((fu) => {
         const time = new Date(fu.datetime).getTime();
@@ -217,20 +253,24 @@ export const Dashboard = () => {
         }
       });
     }
+
     const actionFollowupTime = job.actionDetails?.followUpDate
       ? new Date(job.actionDetails.followUpDate).getTime()
       : null;
+
     if (actionFollowupTime && actionFollowupTime > now) {
       candidates.push(actionFollowupTime);
     }
+
     if (candidates.length === 0) return null;
+
     const soonest = Math.min(...candidates);
     return new Date(soonest).toISOString();
   };
 
   const getClientData = async () => {
     try {
-      const response = await axios.get(`${baseURL}/clients?filter={"limit":9999}`);
+      const response = await axios.get(`${baseURL}/clients?filter={"all":true}`);
       const clientsData = response.data.data;
       setClientValue(clientsData);
       setTotalClients(clientsData.length);
@@ -241,37 +281,129 @@ export const Dashboard = () => {
       const newClient = [...clientsData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
       setNewClientCreated(newClient);
 
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      // --- UPDATED FOLLOW-UP LOGIC: NEXT 24 HOURS ---
+      const now = new Date().getTime(); // Current timestamp
+      const twentyFourHoursLater = now + 24 * 60 * 60 * 1000; // 24 hours in milliseconds
       let futureFollowups = [];
+      
       clientsData.forEach((client) => {
         if (Array.isArray(client.followups)) {
           client.followups.forEach((f) => {
             const followupTime = new Date(f.datetime).getTime();
-            if (followupTime >= startOfToday && !f.completed) {
+            
+            // Filter: Followup must be in the future (after now) AND within the next 24 hours AND not completed
+            if (followupTime > now && followupTime <= twentyFourHoursLater && !f.completed) {
               futureFollowups.push({ client, followup: f });
             }
           });
         }
       });
+      console.log("Future Followups for Clients:", futureFollowups);
+      
+      // Sort by datetime, earliest first
       futureFollowups.sort((a, b) => new Date(a.followup.datetime).getTime() - new Date(b.followup.datetime).getTime());
-      const topFollowups = futureFollowups.slice(0, 6);
+      
+      // Keep ALL followups within the 24-hour window
+      const upcommingFollowups = futureFollowups; 
 
-      setNextFollowupsCount(futureFollowups.length);
-      setNextFollowupClient(futureFollowups[0]?.client || null);
-      setUpcomingFollowups(topFollowups);
+      setNextFollowupsCount(futureFollowups.length); // Total count in next 24 hours
+      setNextFollowupClient(futureFollowups[0]?.client || null); // The very next one
+      setUpcomingFollowups(upcommingFollowups); // Set all followups in the next 24 hours
 
       // Populate clientFollowupsData from this API call
-      setClientFollowupsData(topFollowups.map(item => ({ name: item.client.name, datetime: item.followup.datetime })));
+      setClientFollowupsData(upcommingFollowups.map(item => ({ name: item.client.name, datetime: item.followup.datetime })));
+      // --- END UPDATED FOLLOW-UP LOGIC ---
 
     } catch (error) {
       console.error("Error in getting the value of client data", error);
     }
   };
 
-  const getMeetingData = async () => {
+  const getProjectData = async () => {
     try {
-      const response = await axios.get(`${baseURL}/newfollowups?filter={"limit":9999}`);
+      const response = await axios.get(`${baseURL}/projects?filter={"all":true}`);
+      const projectsData = response.data.data; // Assumed correct
+      setProjectsValue(projectsData);
+      const activeProjectCount = projectsData.filter((project) => project.status === "Active").length;
+      setActiveProjectsValue(activeProjectCount);
+      const newProject = [...projectsData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      setNewProjectCreated(newProject);
+      
+      // --- NEXT 24 HOURS LOGIC ---
+      const now = new Date().getTime();
+      const twentyFourHoursLater = now + 24 * 60 * 60 * 1000;
+      let futureFollowups = [];
+      
+      projectsData.forEach((project) => {
+        if (Array.isArray(project.followups)) {
+          project.followups.forEach((f) => {
+            const followupTime = new Date(f.datetime).getTime();
+            if (followupTime > now && followupTime <= twentyFourHoursLater && !f.completed) {
+              futureFollowups.push({ project, followup: f });
+            }
+          });
+        }
+      });
+      
+      setNextFollowupProjectCount(futureFollowups.length);
+      
+      futureFollowups.sort((a, b) => new Date(a.followup.datetime).getTime() - new Date(b.followup.datetime).getTime());
+      const upcommingFollowups = futureFollowups;
+
+      setNextFollowupProjects(upcommingFollowups[0]?.project || null);
+      setUpcomingFollowupsProjects(upcommingFollowups);
+
+      // Populate projectFollowupsData from this API call
+      setProjectFollowupsData(upcommingFollowups.map(item => ({ name: item.project.title, datetime: item.followup.datetime })));
+      
+    } catch (error) {
+      console.error("Error in getting the value of project data", error);
+    }
+};
+
+ const getJobsData = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/getAllJobProfiles?filter={"all":true}`);
+      const jobsData = response.data.data; // Assumed correct
+      setJobsValue(jobsData);
+      const activeJob = jobsData.filter((job) => job.status === "Active").length;
+      setActiveJobProfile(activeJob);
+      const newJob = [...jobsData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      setNewJobCreated(newJob);
+
+      // --- NEXT 24 HOURS LOGIC ---
+      const now = new Date().getTime();
+      const twentyFourHoursLater = now + 24 * 60 * 60 * 1000;
+      let futureFollowups = [];
+
+      jobsData.forEach((job) => {
+        if (Array.isArray(job.followups)) {
+          job.followups.forEach((f) => {
+            const followupTime = new Date(f.datetime).getTime();
+            if (followupTime > now && followupTime <= twentyFourHoursLater && !f.completed) {
+              futureFollowups.push({ job, followup: f });
+            }
+          });
+        }
+      });
+
+      futureFollowups.sort((a, b) => new Date(a.followup.datetime).getTime() - new Date(b.followup.datetime).getTime());
+      const upcommingFollowups = futureFollowups; 
+
+      setNextFollowupJobsCount(futureFollowups.length);
+      setNextFollowupJobs(upcommingFollowups[0]?.job || null);
+      setUpcomingFollowupsJobs(upcommingFollowups);
+
+      // Populate jobFollowupsData from this API call
+      setJobFollowupsData(upcommingFollowups.map(item => ({ name: item.job.title, datetime: item.followup.datetime })));
+    } catch (error) {
+      console.error("Error in getting the value of job data", error);
+    }
+  };
+
+    const getMeetingData = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/newfollowups?filter={"all":true}`);
       const meetings = response.data.data;
 
       const now = new Date();
@@ -283,69 +415,13 @@ export const Dashboard = () => {
         }))
         .sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
 
-      setMeetingsData(upcomingMeetings.slice(0, 6));
+      setMeetingsFollowupsData(upcomingMeetings.slice(0, 6));
 
       const latest = [...meetings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
       setLatestMeeting(latest || null);
 
     } catch (error) {
       console.error("Error fetching meeting data:", error);
-    }
-  };
-
-  const getProjectData = async () => {
-    try {
-      const response = await axios.get(`${baseURL}/projects`);
-      const projectsData = response.data;
-      setProjectsValue(projectsData);
-      const activeProjectCount = projectsData.filter((project) => project.status === "Active").length;
-      setActiveProjectsValue(activeProjectCount);
-      const newProject = [...projectsData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-      setNewProjectCreated(newProject);
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      let futureFollowups = [];
-      projectsData.forEach((project) => {
-        if (Array.isArray(project.followups)) {
-          project.followups.forEach((f) => {
-            const followupTime = new Date(f.datetime).getTime();
-            if (followupTime >= startOfToday && !f.completed) {
-              futureFollowups.push({ project, followup: f });
-            }
-          });
-        }
-      });
-      setNextFollowupProjectCount(futureFollowups.length);
-      futureFollowups.sort((a, b) => new Date(a.followup.datetime).getTime() - new Date(b.followup.datetime).getTime());
-      const topFollowups = futureFollowups.slice(0, 6);
-      setNextFollowupProjects(topFollowups[0]?.project || null);
-      setUpcomingFollowupsProjects(topFollowups.map((f) => ({ project: f.project, followup: f.followup.datetime })));
-    } catch (error) {
-      console.error("Error in getting the value of project data", error);
-    }
-  };
-
-  const getJobsData = async () => {
-    try {
-      const response = await axios.get(`${baseURL}/getAllJobProfiles`);
-      const jobsData = response.data.data;
-      setJobsValue(jobsData);
-      const activeJob = jobsData.filter((job) => job.status === "Active").length;
-      setActiveJobProfile(activeJob);
-      const newJob = [...jobsData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-      setNewJobCreated(newJob);
-      const now = Date.now();
-      const futureFollowups = jobsData.map((job) => {
-        const followupDate = getTopFollowupDateForJob(job);
-        const followupTime = followupDate ? new Date(followupDate).getTime() : null;
-        return followupTime && followupTime > now ? { job, followupTime } : null;
-      }).filter(Boolean);
-      setNextFollowupJobsCount(futureFollowups.length);
-      const topFollowups = futureFollowups.sort((a, b) => a.followupTime - b.followupTime).slice(0, 3);
-      setNextFollowupJobs(topFollowups[0]?.job || null);
-      setUpcomingFollowupsJobs(topFollowups.map((f) => ({ job: f.job, followup: f.followupTime })));
-    } catch (error) {
-      console.error("Error in getting the value of job data", error);
     }
   };
 
@@ -393,12 +469,12 @@ export const Dashboard = () => {
     }
 
     if (nextFollowupClient) {
-      const latestFollowup = getTopFollowupFromClient(nextFollowupClient);
+      const latestFollowup = getTopFollowupDateForClient(nextFollowupClient);
       if (latestFollowup) {
         activities.push({
           type: "Follow-up-client",
           description: `Follow-up scheduled with ${nextFollowupClient.company || 'a client'}`,
-          time: latestFollowup.datetime,
+          time: latestFollowup,
           icon: Calendar,
           color: "bg-orange-500",
         });
@@ -419,7 +495,7 @@ export const Dashboard = () => {
     }
 
     if (nextFollowupProjects) {
-      const latestFollowup = getTopFollowupDate(nextFollowupProjects);
+      const latestFollowup = getTopFollowupDateForProject(nextFollowupProjects);
       if (latestFollowup) {
         activities.push({
           type: "Follow-up-Project",
@@ -453,9 +529,6 @@ export const Dashboard = () => {
     { title: "Payment Reminders", value: partialPayementStatus, icon: IndianRupee, color: "text-red-600", bgColor: "bg-red-100" },
   ];
 
-  const jobFollowupsData = newupcomingFollowupsJobs.map(item => ({ name: item.job.title, datetime: item.followup }));
-  const projectFollowupsData = newupcomingFollowupsProjects.map(item => ({ name: item.project.title, datetime: item.followup }));
-
   useEffect(() => {
     getClientData();
     getJobsData();
@@ -465,8 +538,8 @@ export const Dashboard = () => {
 
   useEffect(() => {
     // Correctly update total pending follow-ups based on all separate lists
-    setTotalPendingFollowUpBoth(clientFollowupsData.length + meetingsData.length + nextFollowupJobsCount + nextFollowupProjectCount);
-  }, [clientFollowupsData, meetingsData.length, nextFollowupJobsCount, nextFollowupProjectCount]);
+    setTotalPendingFollowUpBoth(clientFollowupsData.length + meetingsFollowupsData.length + nextFollowupJobsCount + nextFollowupProjectCount);
+  }, [clientFollowupsData, meetingsFollowupsData.length, nextFollowupJobsCount, nextFollowupProjectCount]);
 
   return (
     <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6">
@@ -495,7 +568,7 @@ export const Dashboard = () => {
         <UpcomingFollowups title="Upcoming Follow-ups of Projects" followups={projectFollowupsData} />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UpcomingFollowups title="Upcoming Follow-ups of Meetings" followups={meetingsData} />
+        <UpcomingFollowups title="Upcoming Follow-ups of Meetings" followups={meetingsFollowupsData} />
       </div>
     </div>
   );

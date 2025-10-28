@@ -22,6 +22,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import RichTextEditorField from "./RichTextEditorField.";
+const baseURL = import.meta.env.VITE_API_URL;
 
 export default function EditVidhemaBlogForm(): JSX.Element {
   const { slug } = useParams<{ slug: string }>();
@@ -68,8 +69,6 @@ export default function EditVidhemaBlogForm(): JSX.Element {
   const [vidhemaTagsInput, setVidhemaTagsInput] = useState("");
   const [faqInput, setFaqInput] = useState("");
 
-  const baseURL = import.meta.env.VITE_API_URL;
-
   // Fetch blog data by slug
   useEffect(() => {
     const fetchBlogData = async () => {
@@ -77,7 +76,7 @@ export default function EditVidhemaBlogForm(): JSX.Element {
       
       try {
         setFetching(true);
-        const response = await fetch(`https://api.vidhema.com/blogs/slug/${slug}`, {
+        const response = await fetch(`${baseURL}/blogs/slug/${slug}`, {
           headers: {
             'access_token': vidhemaAccessToken,
             'Content-Type': 'application/json',
@@ -300,7 +299,7 @@ export default function EditVidhemaBlogForm(): JSX.Element {
         formDataToSend.append("background_image", backgroundImageFile);
       }
 
-      const response = await fetch(`https://api.vidhema.com/blogs/edit/${slug}`, {
+      const response = await fetch(`${baseURL}/blogs/edit/${slug}`, {
         method: "PUT",
         headers: {
           access_token: vidhemaAccessToken,

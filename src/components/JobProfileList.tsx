@@ -93,6 +93,7 @@ interface JobProfileListProps {
   profiles: JobProfile[];
   onUpdate: (profiles: JobProfile[]) => void;
   onEdit: (profile: JobProfile) => void;
+  refetchProfiles: () => void;
 }
 
 const formatCurrency = (amount: number) => {
@@ -106,6 +107,7 @@ export const JobProfileList = ({
   profiles,
   onUpdate,
   onEdit,
+  refetchProfiles,
 }: JobProfileListProps) => {
   const [editingFollowup, setEditingFollowup] = useState<string | null>(null);
   const [newFollowupDate, setNewFollowupDate] = useState("");
@@ -167,17 +169,16 @@ export const JobProfileList = ({
     const updatedChat = [...(profile.chatMessages || []), newMsg];
 
     try {
-      const res = await axios.put(
-        `${baseURL}/updateJobProfile/${profileId}`,
-        {
-          chatMessages: updatedChat,
-          conversations: (profile.conversations || 0) + 1,
-        }
-      );
+      const res = await axios.put(`${baseURL}/updateJobProfile/${profileId}`, {
+        chatMessages: updatedChat,
+        conversations: (profile.conversations || 0) + 1,
+      });
 
-      // Update state
+      // **Update local state only**
       onUpdate(
-        profiles.map((proj) => (proj._id === profileId ? res.data : proj))
+        profiles.map((proj) =>
+          proj._id === profileId ? { ...proj, chatMessages: updatedChat, conversations: (proj.conversations || 0) + 1 } : proj
+        )
       );
 
       setNewMessage("");
@@ -199,11 +200,9 @@ export const JobProfileList = ({
       });
       return;
     }
-
     const selectedDate = new Date(data.datetime);
     const now = new Date();
 
-    // Validate: Meeting date should not be in the past
     if (selectedDate.getTime() <= now.getTime()) {
       toast({
         title: "Invalid Date/Time",
@@ -225,72 +224,95 @@ export const JobProfileList = ({
         "Update followupdate Send Job Description in list of Project",
         data.datetime
       );
-
-      // Convert local datetime string to UTC ISO format
       const utcDateStr = new Date(data.datetime).toISOString();
-      console.log("Converted to UTC in Job creation:", utcDateStr);
-
       const existingJob = await axios.get(
         `${baseURL}/getJobProfileById/${profileId}`
       );
 
-      const existingTeamName = existingJob.data?.actionDetails?.teamName || [];
-      const existingFollowups = existingJob.data?.followups || [];
+      const existingJobData = existingJob.data; // Assuming .data holds the job object
+      const existingCandidateName = existingJobData?.actionDetails?.candidateName || "";
+      const existingFollowups = existingJobData?.followups || [];
 
+      // ⚠️ OPTIONAL STRICT SEQUENCING CHECK:
+      // Check if there are any *existing* incomplete future follow-ups. If so, block the new one.
+      const hasPendingFollowup = existingFollowups.some(f =>
+        !f.completed && new Date(f.datetime).getTime() > new Date().getTime()
+      );
+
+      if (hasPendingFollowup) {
+        toast({
+          title: "Cannot Schedule New Follow-up",
+          description: "You must complete the existing upcoming follow-up before scheduling a new one.",
+          variant: "destructive",
+        });
+        return; // Uncomment this line if you want to strictly enforce sequencing
+      }
+      
       const newFollowup = {
         id: Date.now(),
         description: data.description,
-        // datetime: data.datetime,
-        datetime: utcDateStr, // use UTC here
+        datetime: utcDateStr,
         completed: false,
       };
 
       const updatedFollowups = [...existingFollowups, newFollowup];
 
-      // ✅ Sort followups by datetime DESC (latest first)
-      const sortedFollowups = [...updatedFollowups].sort(
-        (a, b) =>
-          new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+      // ✅ NEW LOGIC to find the NEXT (earliest) follow-up date
+      const currentTimeMs = now.getTime();
+
+      // 1. Filter for all INCOMPLETE follow-ups that are in the FUTURE
+      const futureIncompleteFollowups = updatedFollowups.filter(f =>
+        !f.completed && new Date(f.datetime).getTime() > currentTimeMs
       );
 
-      // ✅ Determine followUpDate (most recent), and lastfollowUpDate (2nd most recent)
-      const followUpDate = sortedFollowups[0]?.datetime || null;
-      const lastfollowUpDate =
-        sortedFollowups[1]?.datetime || sortedFollowups[0]?.datetime || null;
+      // 2. Sort them ASCENDING (earliest date first)
+      const sortedFutureIncomplete = [...futureIncompleteFollowups].sort(
+        (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+      );
+
+      // 3. Extract the two earliest dates
+      const nextFollowUpDate = sortedFutureIncomplete[0]?.datetime || null;
+
+      // Filter: Keep follow-ups that are EITHER completed OR whose date/time has passed.
+      const pastOrCompletedFollowups = updatedFollowups.filter(f =>
+        f.completed || new Date(f.datetime).getTime() <= currentTimeMs
+      );
+
+      // Sort them DESCENDING (latest date first)
+      const sortedPastOrCompleted = [...pastOrCompletedFollowups].sort(
+        (a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+      );
+
+      // The most recent one is at index 0
+      const lastFollowUpDate = sortedPastOrCompleted[0]?.datetime || null;
 
       const payload = {
         followups: updatedFollowups,
         actionDetails: {
-          //followUpDate: data.datetime,
-          // followUpDate: utcDateStr, // also update followUpDate in UTC
-          followUpDate: followUpDate,
-          teamName: existingTeamName,
-          lastfollowUpDate: lastfollowUpDate,
+          candidateName: existingCandidateName,
+          followUpDate: nextFollowUpDate,       // Next upcoming date
+          lastfollowUpDate: lastFollowUpDate,   // Last completed or passed date
         },
       };
 
-      console.log("Payload to update:", payload);
-
+      // ... (API patch, success handling, and state cleanup logic remains the same)
       const result = await axios.put(
         `${baseURL}/updateJobProfile/${profileId}`,
         payload,
         { headers: { "Content-Type": "application/json" } }
       );
 
-      console.log("Response from PUT:", result.data);
-
-      const response = await axios.get(
-        `${baseURL}/getAllJobProfiles`
-      );
+      const response = await axios.get(`${baseURL}/getAllJobProfiles`);
       onUpdate(response.data.data);
 
-      setSendFollowUpDialog(null); // <- updated to match your new state
+      setSendFollowUpDialog(null);
       setFollowupData({ description: "", datetime: "" });
-      console.log('This is send the followup after job ',response.data.data)
+      refetchProfiles();
       toast({
         title: "Follow Up Added",
         description: `Followup description is addedd in Job profile `,
       });
+
     } catch (error) {
       console.error("Error updating followup:", error);
       toast({
@@ -345,9 +367,11 @@ export const JobProfileList = ({
 
       onUpdate(response.data);
       setEditingFollowup(null);
+      refetchProfiles();
       setNewFollowupDate("");
+      refetchProfiles();
       toast({
-        title: "✅ Job is Updated",
+        title: "Job is Updated",
         description: "The  Job  has been Updated.",
       });
     } catch (error) {
@@ -408,11 +432,16 @@ export const JobProfileList = ({
       );
       // Fetch the latest profiles from the backend
       const response = await axios.get(`${baseURL}/getAllJobProfiles`);
-      console.log('This is the sendprofile to client after response',response.data.data)
+      console.log('This is the sendprofile to client after response', response.data.data)
       onUpdate(response.data.data);
       setSendProfileDialog(null);
       setSelectedCandidate("");
       setSendDateTime("");
+      refetchProfiles();
+      toast({
+        title: "Profile Sent",
+        description: `Profile of ${selectedCandidate} sent to client.`,
+      });
     } catch (error) {
       console.log("Error updating sent profile to client", error);
     }
@@ -434,10 +463,15 @@ export const JobProfileList = ({
       const response = await axios.get(
         `${baseURL}/getAllJobProfiles`
       );
-      console.log('Added the interview shceduled after this job data',response.data.data)
+      console.log('Added the interview shceduled after this job data', response.data.data)
       onUpdate(response.data.data);
       setScheduleInterview(null);
       setInterviewDate("");
+      refetchProfiles();
+      toast({
+        title: "Interview Scheduled",
+        description: "The interview has been scheduled successfully.",
+      });
     } catch (error) {
       console.error("Error updating schedule interview:", error);
     }
@@ -456,7 +490,12 @@ export const JobProfileList = ({
         `${baseURL}/getAllJobProfiles`
       );
       onUpdate(response.data.data); // Update UI with fresh data
-      console.log("Job status updated to Closed",response.data.data);
+      console.log("Job status updated to Closed", response.data.data);
+      refetchProfiles();
+      toast({
+        title: "Job Closed",
+        description: "The job has been closed successfully.",
+      });
     } catch (error) {
       console.error("Error updating job status:", error);
     }
@@ -478,7 +517,7 @@ export const JobProfileList = ({
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-600 mb-4">
+                <div className="grid grid-cols-1 sm:grid-col-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm text-gray-600 mb-4">
                   <div>
                     <p className="font-medium text-gray-900">Client</p>
                     <p className="text-xs">{profile.clientId?.name}</p>
@@ -542,11 +581,19 @@ export const JobProfileList = ({
                     {/* new value of date based not editable of followupDate */}
                     <div className="flex items-center gap-2">
                       <span>
-                        {new Date(
-                          profile.actionDetails.followUpDate
-                        ).toLocaleDateString()}
+                        {profile.actionDetails?.followUpDate
+                          ? new Date(profile.actionDetails.followUpDate).toLocaleDateString()
+                          : "No follow-up"}
                       </span>
                     </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Profiles Sent</p>
+                    <p className="text-blue-600 font-semibold">
+                      {profile?.actionDetails?.markAsSend === true
+                        ? "Yes"
+                        : "No"}
+                    </p>
                   </div>
                 </div>
 
@@ -555,7 +602,7 @@ export const JobProfileList = ({
                     Required Skills
                   </p>
                   <div className="flex flex-wrap gap-1">
-                    {profile.skills.map((skill, index) => (
+                    {profile.skills?.map((skill, index) => (
                       <Badge
                         key={index}
                         variant="secondary"
@@ -567,24 +614,22 @@ export const JobProfileList = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-col-4 gap-4 text-sm">
                   <div>
-                    <p className="font-medium text-gray-900">Profiles Sent</p>
+                    <p className="font-medium text-gray-900">Contact Person</p>
                     <p className="text-blue-600 font-semibold">
-                      {profile?.actionDetails.markAsSend === true
-                        ? "Yes"
-                        : "No"}
+                      {profile?.contactPersonName || "N/A"}
                     </p>
                   </div>
-                  {profile.actionDetails.candidateName && (
+                  {profile.actionDetails?.candidateName && (
                     <div>
                       <p className="font-medium text-gray-900">Candidate</p>
                       <p className="text-green-600 font-semibold">
-                        {profile.actionDetails.candidateName}
+                        {profile.actionDetails?.candidateName}
                       </p>
                     </div>
                   )}
-                  {profile.interviewActionDetails.interviewDateTime && (
+                  {profile.interviewActionDetails?.interviewDateTime && (
                     <div>
                       <p className="font-medium text-gray-900">
                         Interview Date
@@ -763,7 +808,7 @@ export const JobProfileList = ({
                           ) : (
                             <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                               {profile.followups &&
-                              profile.followups.length > 0 ? (
+                                profile.followups.length > 0 ? (
                                 profile.followups
                                   .slice()
                                   .reverse()
@@ -867,6 +912,10 @@ export const JobProfileList = ({
                         </DialogContent>
                       </Dialog>
 
+
+                    </div>
+
+                    <div className="flex gap-2">
                       {profile.status === "Profile Sent" && (
                         <Dialog
                           open={scheduleInterview === profile._id}
@@ -915,7 +964,6 @@ export const JobProfileList = ({
                         </Dialog>
                       )}
                     </div>
-
                     <div className="flex gap-2">
                       {/* old version */}
                       <Button
@@ -926,18 +974,6 @@ export const JobProfileList = ({
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
                       </Button>
-
-                      {/* old version  */}
-
-                      {/* <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => closeJob(profile._id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Close
-                  </Button> */}
 
                       {/* updated close button with popup */}
                       <Dialog

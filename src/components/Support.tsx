@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Eye, Search, User, Mail, Phone, MessageSquare, FileText, Globe, Tag, Calendar } from "lucide-react";
 import axios from "axios";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+const baseURL = import.meta.env.VITE_API_URL;
 
 interface Submission {
     _id: string;
@@ -27,7 +28,7 @@ export const Support = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [apiURL, setApiURL] = useState(
-        "https://api.vidhema.com/vidhemas?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVmMGMxMDY1NGM1ZDUwMGY2NDM3YmQzMSIsImVtYWlsIjoic2FsZXNAdmlkaGVtYS5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTYwMzQzODksImV4cCI6MTc1NjEyMDc4OX0.ufGzkOAIQOJbXxRLyKo3n-cUB7ANVfdjSvXTrpnbFb0"
+        `${baseURL}/vidhemas?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVmMGMxMDY1NGM1ZDUwMGY2NDM3YmQzMSIsImVtYWlsIjoic2FsZXNAdmlkaGVtYS5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTYwMzQzODksImV4cCI6MTc1NjEyMDc4OX0.ufGzkOAIQOJbXxRLyKo3n-cUB7ANVfdjSvXTrpnbFb0`
     );
 
     const itemsPerPage = 10;
@@ -192,6 +193,7 @@ export const Support = () => {
                                     <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
                                     <th className="px-6 py-3 text-left text-sm font-semibold">Phone</th>
                                     <th className="px-6 py-3 text-left text-sm font-semibold">Form Type</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Page Path</th>
                                     <th className="px-6 py-3 text-left text-sm font-semibold">Created</th>
                                     <th className="px-6 py-3 text-center text-sm font-semibold">Action</th>
                                 </tr>
@@ -214,6 +216,9 @@ export const Support = () => {
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-600">
                                                 {s.form_type || "—"}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">
+                                                {s.pathname || "—"}
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-600">
                                                 {new Date(s.createdAt).toLocaleString()}

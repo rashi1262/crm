@@ -82,7 +82,7 @@ export default function AddFollowUps() {
 
     useEffect(() => {
         fetchFollowUps();
-    }, [currentPage, filterStatus]);
+    }, [currentPage, filterStatus, isFormOpen]);
 
     useEffect(() => {
         axios.get(baseURL + "/clients").
@@ -90,7 +90,7 @@ export default function AddFollowUps() {
                 setClients(res.data.data)
                 console.log("clients", res);
             });
-        axios.get("https://api.vidhema.com/getAdminUsers")
+        axios.get(`${baseURL}/getAdminUsers`)
             .then((res) => {
                 setUsers(res.data)
                 console.log("users: ", res);
@@ -116,13 +116,10 @@ export default function AddFollowUps() {
                 await axios.post(baseURL + `/newfollowups`, formData);
             }
 
-            // ✅ Delete token in backend after saving Meeting
-            await axios.get(`${baseURL}/calendar/logout`);
-
-            fetchFollowUps();
             setIsFormOpen(false);
             setIsEditMode(false);
             setSelectedFollowUp(null);
+            fetchFollowUps();
         } catch (err) {
             console.error("Error saving followup", err);
         }
@@ -226,6 +223,142 @@ export default function AddFollowUps() {
         </div>
     );
 
+    // ✅ Click "Create Meeting"
+    const handleCreateMeeting = async () => {
+        const token = localStorage.getItem("google_access_token");
+
+        if (!token) {
+            // Show toast only when authentication is required
+            toast({
+                title: "Google Authentication Required",
+                description: "You need to authenticate with Google to generate a Meet link.",
+                variant: "default",
+                duration: 3000,
+            });
+
+            // Step 1: Ask backend for OAuth URL
+            try {
+                const res = await fetch(`${baseURL}/calendar/auth-url`);
+                const data = await res.json();
+
+                // Step 2: Check if redirected back with tokens in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const access_token = urlParams.get("access_token");
+                const refresh_token = urlParams.get("refresh_token");
+
+                if (access_token) {
+                    // ✅ Save tokens in localStorage
+                    localStorage.setItem("google_access_token", access_token);
+                    if (refresh_token) localStorage.setItem("google_refresh_token", refresh_token);
+
+                    // ✅ Remove tokens from URL to clean up
+                    window.history.replaceState({}, document.title, window.location.pathname);
+
+                    // Open the form after successful authentication
+                    setIsEditMode(false);
+                    setFormData({
+                        clientId: "",
+                        contactPersonId: "",
+                        followUpDate: "",
+                        message: "",
+                        status: "pending",
+                        googleMeetLink: "",
+                    });
+                    setIsFormOpen(true);
+                    return; // stop execution
+                }
+
+                if (data.url) {
+                    window.location.href = data.url; // Redirect to Google OAuth
+                } else {
+                    toast({
+                        title: "❌ Error",
+                        description: "Could not get authentication URL",
+                        variant: "destructive",
+                        duration: 3000,
+                    });
+                }
+            } catch (err) {
+                console.error("Error getting OAuth URL", err);
+                toast({
+                    title: "❌ Error",
+                    description: "Something went wrong while authenticating",
+                    variant: "destructive",
+                    duration: 3000,
+                });
+            }
+        } else {
+            // Already authenticated ✅
+            setIsEditMode(false);
+            setFormData({
+                clientId: "",
+                contactPersonId: "",
+                followUpDate: "",
+                message: "",
+                status: "pending",
+                googleMeetLink: "",
+            });
+            setIsFormOpen(true);
+        }
+    };
+
+    const generateGoogleMeetLink = async () => {
+        const token = localStorage.getItem("google_access_token");
+        if (!token) {
+            toast({
+                title: "❌ Not Authenticated",
+                description: "Please authenticate with Google first.",
+                variant: "destructive",
+                duration: 3000,
+            });
+            return;
+        }
+
+        try {
+            const response = await fetch(`${baseURL}/calendar/create-event`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    summary: "Meeting Meeting",
+                    description: formData.message || "Client Meeting",
+                    start: new Date(formData.followUpDate).toISOString(),
+                    end: new Date(formData.followUpDate).toISOString(),
+                    attendees: [],
+                }),
+            });
+
+            const eventData = await response.json();
+            if (eventData.success && eventData.meetLink) {
+                setFormData({ ...formData, googleMeetLink: eventData.meetLink });
+                toast({
+                    title: "✅ Meet Link Generated",
+                    description: "Google Meet link created successfully.",
+                    variant: "default",
+                    duration: 3000,
+                });
+            } else {
+                toast({
+                    title: "❌ Failed",
+                    description: "Could not generate Meet link.",
+                    variant: "destructive",
+                    duration: 3000,
+                });
+            }
+        } catch (err) {
+            console.error("Error generating Meet link:", err);
+            toast({
+                title: "❌ Error",
+                description: "Something went wrong while generating the Meet link.",
+                variant: "destructive",
+                duration: 3000,
+            });
+        }
+    };
+
+
     return (
         <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6">
             {/* Header */}
@@ -273,18 +406,7 @@ export default function AddFollowUps() {
 
                             {/* Add Meeting Button */}
                             <Button
-                                onClick={() => {
-                                    setIsEditMode(false);
-                                    setFormData({
-                                        clientId: "",
-                                        contactPersonId: "",
-                                        followUpDate: "",
-                                        message: "",
-                                        status: "pending",
-                                        googleMeetLink: "",
-                                    });
-                                    setIsFormOpen(true);
-                                }}
+                                onClick={handleCreateMeeting}
                                 className="h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium px-6"
                             >
                                 <Plus className="w-4 h-4 mr-2" />
@@ -535,67 +657,13 @@ export default function AddFollowUps() {
                                 <Button
                                     type="button"
                                     className="bg-green-600 hover:bg-green-700"
-                                    onClick={async () => {
-                                        try {
-                                            // Step 1: Ask backend if authenticated
-                                            const res = await fetch("http://localhost:3006/calendar/auth-url");
-                                            const data = await res.json();
-
-                                            if (data.authenticated) {
-                                                console.log("✅ Already authenticated, creating event...");
-
-                                                // Step 2: Create Google Meet Event
-                                                const response = await fetch("http://localhost:3006/calendar/create-event", {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({
-                                                        summary: "Meeting Meeting",
-                                                        description: formData.message || "Client Meeting",
-                                                        start: new Date(formData.followUpDate).toISOString(),
-                                                        end: new Date(formData.followUpDate).toISOString(),
-                                                        attendees: [],
-                                                    }),
-                                                });
-
-                                                const eventData = await response.json();
-                                                if (eventData.success && eventData.meetLink) {
-                                                    setFormData({ ...formData, googleMeetLink: eventData.meetLink });
-                                                    toast({
-                                                        title: "✅ Meet Link Generated",
-                                                        description: "Google Meet link created successfully.",
-                                                        variant: "default",
-                                                        duration: 3000,
-                                                    });
-                                                } else {
-                                                    toast({
-                                                        title: "❌ Failed",
-                                                        description: "Could not generate Meet link.",
-                                                        variant: "destructive",
-                                                        duration: 3000,
-                                                    });
-                                                }
-                                            } else if (data.url) {
-                                                console.log("🔑 Redirecting to Google OAuth...");
-                                                window.location.href = data.url; // redirect to authenticate
-                                            }
-                                        } catch (err) {
-                                            console.error("Error generating Meet link:", err);
-                                            toast({
-                                                title: "❌ Error",
-                                                description: "Something went wrong while generating the Meet link. please fill date and message fields.",
-                                                variant: "destructive",
-                                                duration: 3000,
-                                            });
-                                        }
-                                    }}
+                                    onClick={generateGoogleMeetLink}
                                 >
                                     Generate Link
                                 </Button>
+
                             </div>
                         </div>
-
-
-
 
                         {/* ✅ Message */}
                         <div className="space-y-2">

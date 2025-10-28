@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Users, TrendingUp, ChevronDown } from "lucide-react";
+import { Plus, Search, Users, TrendingUp, ChevronDown, Filter } from "lucide-react";
 import { ClientForm } from "./ClientForm";
 import { ClientList } from "./ClientList";
 import axios from "axios";
@@ -13,6 +13,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Client {
   id: string;
@@ -49,6 +56,7 @@ export const ClientManagement = () => {
   const [contactPersons, setContactPersons] = useState<string[]>([]);
   const [selectedContactPerson, setSelectedContactPerson] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
@@ -65,6 +73,7 @@ export const ClientManagement = () => {
         const filter: any = { limit: itemsPerPage, skip };
 
         if (searchTerm) filter.search = searchTerm;
+        if (statusFilter !== "all") filter.where = { status: statusFilter };
         if (selectedContactPerson) filter.where = { contactPerson: selectedContactPerson };
 
         const response = await axios.get(`${baseURL}/clients`, { params: { filter: JSON.stringify(filter) } });
@@ -85,17 +94,17 @@ export const ClientManagement = () => {
         console.error("Error fetching clients:", error);
       }
     },
-    [searchTerm, selectedContactPerson, itemsPerPage, baseURL]
+    [searchTerm, statusFilter, selectedContactPerson, itemsPerPage, baseURL]
   );
 
   useEffect(() => {
     fetchData(currentPage);
-  }, [currentPage, searchTerm, selectedContactPerson, fetchData]);
+  }, [currentPage, searchTerm, selectedContactPerson, fetchData, statusFilter]);
 
   useEffect(() => {
     fetchContactPersons();
   }, []);
-  
+
   const fetchContactPersons = async () => {
     try {
       const response = await axios.get(`${baseURL}/clients`, {
@@ -110,7 +119,7 @@ export const ClientManagement = () => {
       console.error("Error fetching contact persons:", error);
     }
   };
-  
+
   const addClient = (newClient: Client) => {
     setClients((prevClients) => [newClient, ...prevClients]);
     fetchData(currentPage);
@@ -220,61 +229,99 @@ export const ClientManagement = () => {
       <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <CardTitle className="text-xl font-semibold text-gray-800">Client Directory</CardTitle>
-            <div className="relative flex items-center gap-3">
+            <CardTitle className="text-xl font-semibold text-gray-800">
+              Client Directory
+            </CardTitle>
+
+            <div className="relative flex items-center gap-3 flex-wrap">
+              {/* 🔍 Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Search clients by name or contact person..."
                   value={searchTerm}
                   onChange={handleSearchChange}
-                  className="pl-10 h-11 w-72 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  className="pl-10 h-11 w-72 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
                 />
               </div>
 
+              {/* ⚙️ Status Filter */}
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-48 h-11 border-gray-200">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* 👤 Contact Person Filter */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
                     className="h-11 px-4 border-gray-200 hover:border-gray-300 hover:bg-gray-50 flex items-center gap-2 min-w-[140px] justify-between transition-colors duration-200"
                   >
-                    <span className="truncate">{selectedContactPerson || "All Contacts"}</span>
+                    <span className="truncate">
+                      {selectedContactPerson || "All Contacts"}
+                    </span>
                     <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0 transition-transform duration-200 data-[state=open]:rotate-180" />
                   </Button>
                 </DropdownMenuTrigger>
 
-                <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto p-1 bg-white border border-gray-200 rounded-lg shadow-lg" align="start" sideOffset={4}>
+                <DropdownMenuContent
+                  className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto p-1 bg-white border border-gray-200 rounded-lg shadow-lg"
+                  align="start"
+                  sideOffset={4}
+                >
                   <DropdownMenuItem
                     onClick={() => handleContactPersonChange("")}
-                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${
-                      !selectedContactPerson ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"
-                    }`}
+                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${!selectedContactPerson
+                        ? "bg-blue-50 text-blue-700 font-medium"
+                        : "hover:bg-gray-50 text-gray-700"
+                      }`}
                   >
                     <span>All Contacts</span>
                   </DropdownMenuItem>
 
-                  {contactPersons.length > 0 && <div className="h-px bg-gray-200 my-1"></div>}
+                  {contactPersons.length > 0 && (
+                    <div className="h-px bg-gray-200 my-1"></div>
+                  )}
 
                   {contactPersons.length > 0 ? (
                     contactPersons.map((person, idx) => (
                       <DropdownMenuItem
                         key={idx}
                         onClick={() => handleContactPersonChange(person)}
-                        className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${
-                          selectedContactPerson === person ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"
-                        }`}
+                        className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${selectedContactPerson === person
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "hover:bg-gray-50 text-gray-700"
+                          }`}
                       >
                         <span className="truncate">{person}</span>
                       </DropdownMenuItem>
                     ))
                   ) : (
-                    <DropdownMenuItem className="px-3 py-2 text-gray-500 text-sm italic">No contact persons found</DropdownMenuItem>
+                    <DropdownMenuItem className="px-3 py-2 text-gray-500 text-sm italic">
+                      No contact persons found
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
         </CardHeader>
+
         <CardContent className="pt-0">
           <ClientList clients={clients} onUpdate={handleUpdateProfiles} onEdit={handleEdit} refetchClients={() => fetchData(currentPage)} />
 

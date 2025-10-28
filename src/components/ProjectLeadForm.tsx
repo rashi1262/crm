@@ -28,6 +28,7 @@ import {
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+const baseURL = import.meta.env.VITE_API_URL;
 
 interface ProjectProfileFormProps {
   onSave: () => void;
@@ -41,6 +42,7 @@ export const ProjectLeadForm = ({
   editData,
 }: ProjectProfileFormProps) => {
   const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
+  const [adminUsers, setAdminUsers] = useState([]);
   // const formatDate = (dateStr: string) => {
   //   if (!dateStr) return "";
   //   const d = new Date(dateStr);
@@ -113,68 +115,63 @@ export const ProjectLeadForm = ({
     }));
   };
 
-  // this for the skill enter and delet
   const handleSkillKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       const input = e.currentTarget.value.trim();
-      if (input && !formData.skills.includes(input)) {
-        setFormData((prev) => ({
+
+      if (input) {
+        const skillsToAdd = input.split(",").map(s => s.trim()).filter(Boolean);
+
+        setFormData(prev => ({
           ...prev,
-          skills: [...prev.skills, input],
+          skills: Array.from(new Set([...prev.skills, ...skillsToAdd])),
         }));
+
         e.currentTarget.value = "";
       }
     }
   };
 
-  const removeSkill = (skillToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      skills: prev.skills.filter((skill) => skill !== skillToRemove),
-    }));
+  // Add skills if user pastes or clicks away
+  const handleSkillBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const input = e.currentTarget.value.trim();
+    if (input) {
+      const skillsToAdd = input.split(",").map(s => s.trim()).filter(Boolean);
+      setFormData(prev => ({
+        ...prev,
+        skills: Array.from(new Set([...prev.skills, ...skillsToAdd])),
+      }));
+      e.currentTarget.value = "";
+    }
   };
 
-  const [adminUsers, setAdminUsers] = useState([]);
-
-  // useEffect(() => {
-  //   const fetchData = async () => {
-  //     try {
-  //       const [clientsRes, adminUsersRes] = await Promise.all([
-  //         axios.get(`${baseURL}/clients`),
-  //         axios.get("https://api.vidhema.com/getAdminUsers"),
-  //       ]);
-
-  //       setClients(clientsRes.data.data);
-  //       setAdminUsers(adminUsersRes.data);
-
-  //       console.log("Clients:", clientsRes.data.data);
-  //       console.log("Admin Users:", adminUsersRes.data);
-  //     } catch (error) {
-  //       console.error("Error fetching data:", error);
-  //     }
-  //   };
-
-  //   fetchData();
-  // }, []);
-
+  const removeSkill = (skillToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: prev.skills.filter(skill => skill !== skillToRemove),
+    }));
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [clientsRes, adminUsersRes] = await Promise.all([
-          axios.get(`${baseURL}/clients`),
-          axios.get("https://api.vidhema.com/getAdminUsers"),
+          axios.get(`${baseURL}/clients?filter={"all":true}`),
+          axios.get(`${baseURL}/getAdminUsers`),
         ]);
 
         setClients(clientsRes.data.data);
         const fetchedAdminUsers = adminUsersRes.data;
+        console.log("Fetched Admin Users:", fetchedAdminUsers);
         setAdminUsers(fetchedAdminUsers);
 
         if (editData && editData.actionDetails?.employeeId) {
           const contactPerson = fetchedAdminUsers.find(
             (user) => user._id === editData.actionDetails.employeeId
           );
+
+          console.log("Contact Person:", contactPerson);
           if (contactPerson) {
             setFormData((prev) => ({
               ...prev,
@@ -194,8 +191,6 @@ export const ProjectLeadForm = ({
   const navigate = useNavigate();
 
   // getting the env data of the api
-
-  const baseURL = import.meta.env.VITE_API_URL;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,14 +278,6 @@ export const ProjectLeadForm = ({
         return;
       }
     }
-
-    // console.log("Raw Followup date creation of Project (local):",formData.followUpDate);
-    // console.log("Udate followupdate in creation of Project", formData.followUpDate);
-
-    // // convert localdateandtime to utc for consistency db
-    // const utcDateStr=new Date(formData.followUpDate).toISOString()
-    // // converted utcDateStr
-    //  console.log("Converted to UTC in Project  creation :", utcDateStr);
 
     const payload = {
       clientId: selectedClient._id,
@@ -520,29 +507,8 @@ export const ProjectLeadForm = ({
                       </SelectContent>
                     </Select>
                   </div>
-
                 </div>
 
-                {/* old team section */}
-
-                {/* <div className="space-y-2">
-                  <Label
-                    htmlFor="teamName"
-                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                  >
-                    <User className="h-4 w-4 text-green-600" />
-                    Team
-                  </Label>
-                  <Input
-                    id="teamName"
-                    value={formData.teamName}
-                    onChange={(e) => handleChange("teamName", e.target.value)}
-                    placeholder="Enter Team name (if selected)"
-                    className="h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg"
-                  />
-                </div> */}
-
-                {/* new Team Section  */}
                 <div className="space-y-2">
                   <Label
                     htmlFor="teamName"
@@ -628,26 +594,6 @@ export const ProjectLeadForm = ({
                   </div>
                 </div>
 
-                {/* <div className="space-y-2">
-                  <Label
-                    htmlFor="skills"
-                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                  >
-                    <Code className="h-4 w-4 text-indigo-600" />
-                    Required Skills (comma separated)
-                  </Label>
-                  <Input
-                    id="skills"
-                    value={formData.skills}
-                    onChange={(e) => handleChange("skills", e.target.value)}
-                    placeholder="e.g., React, TypeScript, Node.js, AWS"
-                    className="h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg"
-                    required
-                  />
-                </div> */}
-
-                {/* newly added skill set on the basis of the enter */}
-
                 <div className="space-y-2">
                   <Label
                     htmlFor="skills"
@@ -661,6 +607,7 @@ export const ProjectLeadForm = ({
                     id="skills"
                     placeholder="e.g., React, TypeScript, AWS"
                     onKeyDown={handleSkillKeyDown}
+                    onBlur={handleSkillBlur}
                     className="h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg"
                   />
 

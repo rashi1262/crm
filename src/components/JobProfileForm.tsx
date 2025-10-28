@@ -25,9 +25,28 @@ import {
   FileText,
   Users,
 } from "lucide-react";
+const baseURL = import.meta.env.VITE_API_URL;
+
+interface JobProfile {
+  _id?: string;
+  title: string;
+  clientId?: { _id: string; name: string };
+  contactPersonName?: string;
+  contactPersonId?: string;
+  actionDetails?: {
+    candidateName?: string;
+    followUpDate?: string;
+    markAsSend?: boolean;
+  };
+  clientBudget?: number | string;
+  skills?: string[];
+  description?: string;
+  status?: string;
+  jd?: string;
+}
 
 interface JobProfileFormProps {
-  onSave: () => void;
+  onSave: (newProfile: JobProfile) => void;
   onCancel: () => void;
   editData?: any;
 }
@@ -44,12 +63,15 @@ export const JobProfileForm = ({
     if (isNaN(d.getTime())) return "";
     return d.toISOString().slice(0, 10);
   };
+  
+  console.log("Edit Data in JobProfileForm:", editData);
 
   const [formData, setFormData] = useState({
     title: editData?.title || "",
-    clientName: editData?.clientId?.name || "",
+    clientId: editData?.clientId?._id || "",
     contactPersonName: editData?.contactPersonName || "",
-    contactPersonId: editData?.contactPersonId || "",
+    // contactPersonId: editData?.contactPersonId || "",
+    contactPersonId: editData?.actionDetails?.employeeId || "",
     followUpDate: formatDate(editData?.actionDetails?.followUpDate || ""),
     clientBudget: editData?.clientBudget || "",
     // skills: editData?.skills
@@ -65,60 +87,74 @@ export const JobProfileForm = ({
     candidateName: editData?.actionDetails?.candidateName || "",
   });
 
-const [adminUsers, setAdminUsers] = useState([]);
-useEffect(() => {
-  
-  const fetchData = async () => {
-    try {
-      const [clientsRes, adminUsersRes] = await Promise.all([
-        axios.get(`${baseURL}/clients`),
-        axios.get("https://api.vidhema.com/getAdminUsers"),
-      ]);
+  // here above work agian next day
+  const [adminUsers, setAdminUsers] = useState([]);
+  useEffect(() => {
 
-      setClients(clientsRes.data.data);
-      setAdminUsers(adminUsersRes.data);
+    const fetchData = async () => {
+      try {
+        const [clientsRes, adminUsersRes] = await Promise.all([
+          axios.get(`${baseURL}/clients?filter={"all":true}`),
+          axios.get(`${baseURL}/getAdminUsers`),
+        ]);
 
-      console.log("Clients:", clientsRes.data.data);
-      console.log("Admin Users:", adminUsersRes.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
+        setClients(clientsRes.data.data);
+        setAdminUsers(adminUsersRes.data);
 
-  fetchData();
-}, []);
+        console.log("Clients:", clientsRes.data.data);
+        console.log("Admin Users:", adminUsersRes.data);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
 
-  // this for the skill enter and delet
+    fetchData();
+  }, []);
+
+
   const handleSkillKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       const input = e.currentTarget.value.trim();
-      if (input && !formData.skills.includes(input)) {
-        setFormData((prev) => ({
+
+      if (input) {
+        const skillsToAdd = input.split(",").map(s => s.trim()).filter(Boolean);
+
+        setFormData(prev => ({
           ...prev,
-          skills: [...prev.skills, input],
+          skills: Array.from(new Set([...prev.skills, ...skillsToAdd])), // unique
         }));
+
         e.currentTarget.value = "";
       }
     }
   };
 
-  const removeSkill = (skillToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      skills: prev.skills.filter((skill) => skill !== skillToRemove),
-    }));
+  // Add skills if user pastes or clicks away
+  const handleSkillBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const input = e.currentTarget.value.trim();
+    if (input) {
+      const skillsToAdd = input.split(",").map(s => s.trim()).filter(Boolean);
+      setFormData(prev => ({
+        ...prev,
+        skills: Array.from(new Set([...prev.skills, ...skillsToAdd])),
+      }));
+      e.currentTarget.value = "";
+    }
   };
 
-  // getting the env data of the api
-
-  const baseURL = import.meta.env.VITE_API_URL;
+  const removeSkill = (skillToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: prev.skills.filter(skill => skill !== skillToRemove),
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const selectedClient = clients.find(
-      (client) => client.name === formData.clientName
+      (client) => client._id === formData.clientId
     );
     if (!selectedClient) {
       console.log("Please select a client.");
@@ -216,15 +252,8 @@ useEffect(() => {
       }
     }
 
-    //  console.log("Raw Followup date creation of client (local):",formData.followUpDate);
-    //   console.log("Udate followupdate in creation of client", formData.followUpDate);
-
-    //   // convert localdateandtime to utc for consistency db
-    //   const utcDateStr=new Date(formData.followUpDate).toISOString()
-    //   // converted utcDateStr
-    //    console.log("Converted to UTC in client creation :", utcDateStr);
     const payload = {
-      clientId: selectedClient._id,
+      clientId: selectedClient, // Pass the full client object as required by JobProfile
       title: formData.title,
       contactPersonName: formData.contactPersonName,
       // skills: formData.skills.split(",").map((skill: string) => skill.trim()),
@@ -239,7 +268,7 @@ useEffect(() => {
       actionDetails: {
         candidateName: formData.candidateName,
         followUpDate: formData.followUpDate,
-        
+        employeeId: formData.contactPersonId,
         markAsSend: formData.status === "Profile Sent",
       },
     };
@@ -267,7 +296,8 @@ useEffect(() => {
         });
         console.log("Responde data form backend when created", response.data);
       }
-      onSave();
+      onSave(payload);
+      onCancel();
     } catch (error) {
       console.log("Failed to save job profile");
       console.error(error);
@@ -386,59 +416,70 @@ useEffect(() => {
                       Client Name
                     </Label>
                     <Select
-                      value={formData.clientName}
-                      onValueChange={(value) =>
-                        handleChange("clientName", value)
-                      }
+                      value={formData.clientId}
+                      onValueChange={(value) => {
+                        const selectedClient = clients.find((c) => c._id === value);
+                        handleChange("clientId", value);
+                        handleChange("clientName", selectedClient?.name || "");
+                      }}
                     >
-                      <SelectTrigger
-                        id="clientName"
-                        className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                      >
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
                         <SelectValue placeholder="Select a client" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                        {clients.map((client) => (
-                          <SelectItem key={client._id} value={client.name}>
-                            {client.name}
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                        {clients.length > 0 ? (
+                          clients.map((client) => (
+                            <SelectItem key={client._id} value={client._id}>
+                              {client.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-clients" disabled>
+                            No clients found
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-  <Label
-    htmlFor="contactPersonId"
-    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-  >
-    <User className="h-4 w-4 text-blue-600" />
-    Contact Person
-  </Label>
+                    <Label
+                      htmlFor="contactPersonId"
+                      className="text-sm font-semibold text-gray-700 flex items-center gap-2"
+                    >
+                      <User className="h-4 w-4 text-blue-600" />
+                      Contact Person
+                    </Label>
 
-  <Select
-    value={formData.contactPersonId}
-    onValueChange={(val) => handleChange("contactPersonId", val)} // 👉 storing _id
-  >
-    <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
-      <SelectValue placeholder="Select a contact person" />
-    </SelectTrigger>
+                    <Select
+                      value={formData.contactPersonId}
+                      onValueChange={(val) => {
+                        const selectedUser = adminUsers.find(u => u._id === val);
+                        console.log("Selected User:", selectedUser, val);
+                        handleChange("contactPersonId", val);
+                        handleChange("contactPersonName", selectedUser?.fullName || "");
+                      }}
+                    >
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
+                        <SelectValue placeholder="Select a contact person" />
+                      </SelectTrigger>
 
-    <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
-      {adminUsers.length > 0 ? (
-        adminUsers.map((user) => (
-          <SelectItem key={user._id} value={user._id}>
-            {user.fullName || user.name || user.username || user.email}
-          </SelectItem>
-        ))
-      ) : (
-        <SelectItem value="no-users" disabled>
-          No users found
-        </SelectItem>
-      )}
-    </SelectContent>
-  </Select>
-</div>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                        {adminUsers.length > 0 ? (
+                          adminUsers.map((user) => (
+                            <SelectItem key={user._id} value={user._id}>
+                              {user.fullName || user.name || user.username || user.email}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-users" disabled>
+                            No users found
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+
+                  </div>
 
                 </div>
 
@@ -539,17 +580,17 @@ useEffect(() => {
                     className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                   >
                     <Code className="h-4 w-4 text-indigo-600" />
-                    Required Skills (Press Enter to Add)
+                    Required Skills (Press Enter or Type Comma to Add)
                   </Label>
 
                   <Input
                     id="skills"
                     placeholder="e.g., React, TypeScript, AWS"
                     onKeyDown={handleSkillKeyDown}
+                    onBlur={handleSkillBlur}
                     className="h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg"
                   />
 
-                  {/* Skills Tags Display */}
                   <div className="flex flex-wrap gap-2 mt-2">
                     {formData.skills.map((skill, idx) => (
                       <div
@@ -568,6 +609,7 @@ useEffect(() => {
                     ))}
                   </div>
                 </div>
+
 
                 <div className="space-y-2">
                   <Label

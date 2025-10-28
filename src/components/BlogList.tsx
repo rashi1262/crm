@@ -71,7 +71,7 @@ const fetchSolarStationBlogs = async (
     const errorData = await response.json();
     throw new Error(
       errorData.message ||
-        `SolarStation API Error: ${response.status} ${response.statusText}`
+      `SolarStation API Error: ${response.status} ${response.statusText}`
     );
   }
   const apiResponse: SolarStationApiResponse = await response.json();
@@ -110,7 +110,7 @@ const fetchVidhemaBlogs = async (
     const errorData = await response.json();
     throw new Error(
       errorData.message ||
-        `Vidhema API Error: ${response.status} ${response.statusText}`
+      `Vidhema API Error: ${response.status} ${response.statusText}`
     );
   }
   const result = await response.json();
@@ -173,7 +173,11 @@ export default function BlogList(): JSX.Element {
       date: rawBlog.date,
       author: "SolarStation Team",
       category: "General",
-      tags: Array.isArray(rawBlog.tags) ? rawBlog.tags : [],
+      tags: Array.isArray(rawBlog.tags)
+        ? rawBlog.tags
+        : typeof rawBlog.tags === "string" && rawBlog.tags.trim() !== ""
+          ? rawBlog.tags.split(",").map(tag => tag.trim())
+          : [],
       isFeatured: rawBlog.isFeatured ? "Yes" : "No",
       website: "solarstation.in",
       keywords: rawBlog.keywords || "",
@@ -270,7 +274,7 @@ export default function BlogList(): JSX.Element {
           const errorData = await response.json();
           throw new Error(
             errorData.message ||
-              `Vidhema API Error: ${response.status} ${response.statusText}`
+            `Vidhema API Error: ${response.status} ${response.statusText}`
           );
         }
 
@@ -315,7 +319,7 @@ export default function BlogList(): JSX.Element {
           const errorData = await response.json();
           throw new Error(
             errorData.message ||
-              `SolarStation API Error: ${response.status} ${response.statusText}`
+            `SolarStation API Error: ${response.status} ${response.statusText}`
           );
         }
         const apiResponse: SolarStationApiResponse = await response.json();
@@ -584,7 +588,7 @@ export default function BlogList(): JSX.Element {
         let response;
         if (blogToDelete.website === "solarstation.in") {
           response = await fetch(
-            `https://api.solarstation.in/blogs/deleteBlog/${id}`,
+            `https://api.solarstation.in/blogs/deleteBlogById/${id}`,
             {
               method: "DELETE",
               headers: { "Content-Type": "application/json" },
@@ -621,7 +625,7 @@ export default function BlogList(): JSX.Element {
           const errorData = await response.json();
           throw new Error(
             errorData.message ||
-              `API Error: ${response.status} ${response.statusText}`
+            `API Error: ${response.status} ${response.statusText}`
           );
         }
 
@@ -821,7 +825,7 @@ export default function BlogList(): JSX.Element {
                     <Eye className="h-4 w-4" />
                   </Button>
                   {/* Edit button: Only enable if it's from a known editable source (e.g., solarstation.in) */}
-              
+
                   {/* Edit button: Enable for both solarstation.in and vidhema.com */}
                   {(blog.website === "solarstation.in" ||
                     blog.website === "vidhema.com") &&
@@ -832,7 +836,8 @@ export default function BlogList(): JSX.Element {
                         className="border-green-200 text-green-700 hover:bg-green-50"
                         onClick={() => {
                           if (blog.website === "solarstation.in") {
-                            navigate(`/blog/edit/${blog.slug}`);
+                            // navigate(`/blog/edit/${blog.id}`, {state: { blog }});
+                            navigate(`/blog/edit/${blog.id}`);
                           } else if (blog.website === "vidhema.com") {
                             navigate(`/blog/vidhema/edit/${blog.slug}`);
                           }

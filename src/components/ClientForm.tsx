@@ -55,7 +55,7 @@ export const ClientForm = ({ onSave, onCancel, editData }: ClientFormProps) => {
   useEffect(() => {
     const fetchAdmins = async () => {
       try {
-        const res = await axios.get("https://api.vidhema.com/getAdminUsers");
+        const res = await axios.get(`${baseURL}/getAdminUsers`);
         console.log("users: ", res.data);
 
         // ✅ Corrected: users are inside res.data, not res.data.data

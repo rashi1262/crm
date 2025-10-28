@@ -90,12 +90,14 @@ interface ProjectProfileListProps {
   projects: ProjectProfile[];
   onUpdate: (projects: ProjectProfile[]) => void;
   onEdit: (projects: ProjectProfile) => void;
+  refetchProjects: () => void;
 }
 
 export const ProjectLeadList = ({
   projects,
   onUpdate,
   onEdit,
+  refetchProjects
 }: ProjectProfileListProps) => {
   const [editingFollowup, setEditingFollowup] = useState<string | null>(null);
   const [newFollowupDate, setNewFollowupDate] = useState("");
@@ -126,6 +128,8 @@ export const ProjectLeadList = ({
   // for chat Purpose
   const [newMessage, setNewMessage] = useState("");
   const [chatProject, setChatProject] = useState<string | null>(null);
+
+  const baseURL = import.meta.env.VITE_API_URL;
 
   // message ko group kerne ke liye
   const groupMessagesByDate = (
@@ -167,9 +171,9 @@ export const ProjectLeadList = ({
 
       // Update state
       onUpdate(
-        projects.map((proj) => (proj._id === projectId ? res.data : proj))
+        projects.map((proj) => (proj._id === projectId ? res.data.data : proj))
       );
-
+      refetchProjects();
       setNewMessage("");
     } catch (err) {
       console.error("Chat message update failed:", err);
@@ -184,23 +188,6 @@ export const ProjectLeadList = ({
   };
 
   const { toast } = useToast();
-
-  // const getStatusColor = (status: string) => {
-  //   switch (status) {
-  //     case "Active":
-  //       return "bg-green-100 text-green-800";
-  //     case "Lead Sent":
-  //       return "bg-blue-100 text-blue-800";
-  //     case "Meeting Scheduled":
-  //       return "bg-purple-100 text-purple-800";
-  //     case "Closed":
-  //       return "bg-gray-100 text-gray-800";
-  //     case "On Hold":
-  //       return "bg-yellow-100 text-yellow-800";
-  //     default:
-  //       return "bg-gray-100 text-gray-800";
-  //   }
-  // };
 
   // new get status
   function getStatusColor(status: string): string {
@@ -221,10 +208,6 @@ export const ProjectLeadList = ({
         return "bg-gray-100 text-gray-800 hover:bg-gray-100 text-gray-800";
     }
   }
-
-  // getting the env data of the api
-
-  const baseURL = import.meta.env.VITE_API_URL;
 
   const updateFollowupDate = async (id: string) => {
     try {
@@ -249,7 +232,8 @@ export const ProjectLeadList = ({
       // Fetch the latest profiles from the backend
       const response = await axios.get(`${baseURL}/projects`);
 
-      onUpdate(response.data);
+      onUpdate(response.data.data);
+      refetchProjects();
       setEditingFollowup(null);
       setNewFollowupDate("");
       console.log(
@@ -293,7 +277,7 @@ export const ProjectLeadList = ({
   //     // Fetch the latest profiles from the backend
   //     const response = await axios.get(`${baseURL}/projects`);
 
-  //     onUpdate(response.data);
+  //     onUpdate(response.data.data);
   //     setSendProfileDialog(null);
   //     setSelectedCandidate("");
   //     setSendDateTime("");
@@ -362,7 +346,8 @@ export const ProjectLeadList = ({
       // Fetch the latest profiles from the backend
       const response = await axios.get(`${baseURL}/projects`);
 
-      onUpdate(response.data);
+      onUpdate(response.data.data);
+      refetchProjects();
       setSendProfileDialog(null);
       setProposalDescription("");
       setSendDateTime("");
@@ -396,11 +381,9 @@ export const ProjectLeadList = ({
       });
       return;
     }
-
     const selectedDate = new Date(data.datetime);
     const now = new Date();
 
-    // Validate: Meeting date should not be in the past
     if (selectedDate.getTime() <= now.getTime()) {
       toast({
         title: "Invalid Date/Time",
@@ -409,83 +392,109 @@ export const ProjectLeadList = ({
       });
       return;
     }
+
     try {
-      console.log("Sending followup for project:", projectId);
+      console.log("Sending followup for Project:", projectId);
       console.log("Followup Description:", data.description);
       console.log("Send DateTime:", data.datetime);
       console.log(
-        "Raw Followup date Send Proposal Description Updatelist of Project (local):",
+        "Raw Followup date Send Projects Description Updatelist of Project (local):",
         data.datetime
       );
       console.log(
-        "Update followupdate Send Proposal Description in list of Project",
+        "Update followupdate Send Projects Description in list of Project",
         data.datetime
       );
-
-      // Convert local datetime string to UTC ISO format
+      // --- Data Fetching and Initialization ---
       const utcDateStr = new Date(data.datetime).toISOString();
-      console.log("Converted to UTC in Project creation:", utcDateStr);
-
       const existingProject = await axios.get(
         `${baseURL}/projects/${projectId}`
       );
 
-      const existingTeamName =
-        existingProject.data?.actionDetails?.teamName || [];
-      const existingFollowups = existingProject.data?.followups || [];
+      const existingProjectData = existingProject.data;
+      const existingTeamName = existingProjectData?.actionDetails?.teamName || [];
+      const existingFollowups = existingProjectData?.followups || [];
 
+      const currentTimeMs = now.getTime();
+
+      // --- 🔴 MANDATORY SEQUENTIAL FOLLOW-UP CHECK ---
+      // Block new follow-up if an earlier one is INCOMPLETE AND STILL IN THE FUTURE.
+      const hasPendingFutureFollowup = existingFollowups.some(f =>
+        !f.completed && new Date(f.datetime).getTime() > currentTimeMs
+      );
+
+      if (hasPendingFutureFollowup) {
+        toast({
+          title: "Cannot Schedule New Follow-up",
+          description: "There is an existing upcoming follow-up that must be completed or passed before a new one can be scheduled.",
+          variant: "destructive",
+        });
+        return; // Uncomment this line if you want to strictly enforce sequencing
+      }
+
+      // --- Prepare New Follow-up ---
       const newFollowup = {
         id: Date.now(),
         description: data.description,
-        // datetime: data.datetime,
-        datetime: utcDateStr, // use UTC here
+        datetime: utcDateStr,
         completed: false,
       };
 
       const updatedFollowups = [...existingFollowups, newFollowup];
 
-      // ✅ Sort followups from latest to oldest
-      const sortedFollowups = [...updatedFollowups].sort(
-        (a, b) =>
-          new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+      // Filter for all INCOMPLETE follow-ups that are in the FUTURE
+      const futureIncompleteFollowups = updatedFollowups.filter(f =>
+        !f.completed && new Date(f.datetime).getTime() > currentTimeMs
       );
 
-      // ✅ Safely get the top two follow-ups
-      const followUpDate = sortedFollowups[0]?.datetime || null;
-      const lastfollowUpDate =
-        sortedFollowups[1]?.datetime || sortedFollowups[0]?.datetime || null;
+      // Sort them ASCENDING (earliest date first)
+      const sortedFutureIncomplete = [...futureIncompleteFollowups].sort(
+        (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+      );
 
+      const nextFollowUpDate = sortedFutureIncomplete[0]?.datetime || null;
+
+      // Filter: Keep follow-ups that are EITHER completed OR whose date/time has passed.
+      const pastOrCompletedFollowups = updatedFollowups.filter(f =>
+        f.completed || new Date(f.datetime).getTime() <= currentTimeMs
+      );
+
+      // Sort them DESCENDING (latest date first)
+      const sortedPastOrCompleted = [...pastOrCompletedFollowups].sort(
+        (a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime()
+      );
+
+      const lastFollowUpDate = sortedPastOrCompleted[0]?.datetime || null;
+
+      // --- Payload Construction ---
       const payload = {
         followups: updatedFollowups,
         actionDetails: {
-          //followUpDate: data.datetime,
-          // followUpDate: utcDateStr, // also update followUpDate in UTC
-          followUpDate: followUpDate,
           teamName: existingTeamName,
-          lastfollowUpDate: lastfollowUpDate,
+          followUpDate: nextFollowUpDate,
+          lastfollowUpDate: lastFollowUpDate,
         },
+        // Note: Your schema has MeetingActionDetails, but we are not touching it here.
       };
 
-      console.log("Payload to update:", payload);
-
+      // --- API Patch and Success Handling ---
       const result = await axios.put(
         `${baseURL}/projects/${projectId}`,
         payload,
         { headers: { "Content-Type": "application/json" } }
       );
 
-      console.log("Response from PUT:", result.data);
-
       const response = await axios.get(`${baseURL}/projects`);
-      onUpdate(response.data);
+      onUpdate(response.data.data);
 
-      setSendFollowUpDialog(null); // <- updated to match your new state
+      setSendFollowUpDialog(null);
       setFollowupData({ description: "", datetime: "" });
-
+      refetchProjects();
       toast({
         title: "Follow Up Added",
-        description: `Followup description is addedd in project profile `,
+        description: `Followup description is addedd in Project profile`,
       });
+
     } catch (error) {
       console.error("Error updating followup:", error);
       toast({
@@ -535,7 +544,8 @@ export const ProjectLeadList = ({
       );
       // Fetch the latest profiles from the backend
       const response = await axios.get(`${baseURL}/projects`);
-      onUpdate(response.data);
+      onUpdate(response.data.data);
+      refetchProjects();
       setScheduleMeeting(null);
       setMeetingDate("");
       console.log(
@@ -566,7 +576,8 @@ export const ProjectLeadList = ({
 
       // Fetch the latest profiles from the backend
       const response = await axios.get(`${baseURL}/projects`);
-      onUpdate(response.data); // Update UI with fresh data
+      onUpdate(response.data.data);
+      refetchProjects();
       console.log(
         "this is closeproject in list page of project",
         response.data
@@ -699,7 +710,13 @@ export const ProjectLeadList = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
+                  <div>
+                    <p className="font-medium text-gray-900">Contact Person</p>
+                    <p className="text-blue-600 font-semibold">
+                      {project?.contactPersonName || "N/A"}
+                    </p>
+                  </div>
                   <div>
                     <p className="font-medium text-gray-900">Lead Sent</p>
                     <p className="text-blue-600 font-semibold">
@@ -710,24 +727,27 @@ export const ProjectLeadList = ({
                       {/* newly version */}
                       <p className="text-blue-600 font-semibold">
                         {project.actionDetails?.markAsSend === true ||
-                        project.status === "Lead Sent"
+                          project.status === "Lead Sent"
                           ? "Yes"
                           : "No"}
                       </p>
                     </p>
                   </div>
 
-                  {/* old teamName type */}
-
-                  {/* {project.actionDetails?.teamName && (
+                  {project.MeetingActionDetails?.MeetingDateTime && (
                     <div>
-                      <p className="font-medium text-gray-900">Team</p>
+                      <p className="font-medium text-gray-900">
+                        Meeting Date & Time
+                      </p>
                       <p className="text-green-600 font-semibold">
-                        {project.actionDetails.teamName}
+                        {new Date(
+                          project.MeetingActionDetails.MeetingDateTime
+                        ).toLocaleDateString()}
                       </p>
                     </div>
-                  )} */}
-
+                  )}
+                </div>
+                <div>
                   {/* new teamName as an arrya */}
                   {project.actionDetails?.teamName &&
                     project.actionDetails.teamName.length > 0 && (
@@ -746,146 +766,8 @@ export const ProjectLeadList = ({
                         </div>
                       </div>
                     )}
-
-                  {project.MeetingActionDetails?.MeetingDateTime && (
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        Meeting Date & Time
-                      </p>
-                      <p className="text-green-600 font-semibold">
-                        {new Date(
-                          project.MeetingActionDetails.MeetingDateTime
-                        ).toLocaleDateString()}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
-
-              {/* old comment */}
-              {/* <div className="flex flex-col gap-2 ml-6">
-                <div className="flex gap-2">
-                  <Dialog
-                    open={sendProfileDialog === project._id}
-                    onOpenChange={(open) =>
-                      setSendProfileDialog(open ? project._id : null)
-                    }
-                  >
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
-                        onClick={() => {
-                          setSendProfileDialog(project._id);
-                          setSelectedCandidate("");
-                          setSendDateTime("");
-                        }}
-                      >
-                        <Send className="h-4 w-4 mr-1" />
-                        Send Proposal
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Send Proposal to Client</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label>ClientName</Label>
-                          <Input
-                            value={selectedCandidate}
-                            onChange={(e) =>
-                              setSelectedCandidate(e.target.value)
-                            }
-                            placeholder="Enter Client name"
-                          />
-                        </div>
-                        <div>
-                          <Label>Send Date & Time</Label>
-                          <Input
-                            type="datetime-local"
-                            value={sendDateTime}
-                            onChange={(e) => setSendDateTime(e.target.value)}
-                          />
-                        </div>
-                        <Button
-                          onClick={() => sendProfileToClient(project._id)}
-                          className="w-full"
-                        >
-                          Send 
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  {project.status === "Lead Sent" && (
-                    <Dialog
-                      open={scheduleInterview === project._id}
-                      onOpenChange={(open) =>
-                        setScheduleInterview(open ? project._id : null)
-                      }
-                    >
-                      <DialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setScheduleInterview(project._id);
-                            setInterviewDate("");
-                          }}
-                        >
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Schedule Meeting
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Schedule Meeting</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label>Meeting Date & Time</Label>
-                            <Input
-                              type="datetime-local"
-                              value={interviewDate}
-                              onChange={(e) => setInterviewDate(e.target.value)}
-                            />
-                          </div>
-                          <Button
-                            onClick={() =>
-                              scheduleInterviewForProject(project._id)
-                            }
-                            className="w-full"
-                          >
-                            Schedule Interview
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onEdit(project)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => closeProject(project._id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Close
-                  </Button>
-                </div>
-              </div> */}
 
               {/* conditon based rendering if closed nothing show else all show */}
               {project.status !== "Closed" && (
@@ -1065,7 +947,7 @@ export const ProjectLeadList = ({
                         ) : (
                           <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                             {project.followups &&
-                            project.followups.length > 0 ? (
+                              project.followups.length > 0 ? (
                               project.followups
                                 .slice()
                                 .reverse()
@@ -1168,7 +1050,9 @@ export const ProjectLeadList = ({
                         </form>
                       </DialogContent>
                     </Dialog>
+                  </div>
 
+                  <div className="flex gap-2">
                     {/* Schedule Meeting Button (if Lead Sent) */}
                     {project.status === "Lead Sent" && (
                       <Dialog
@@ -1216,7 +1100,6 @@ export const ProjectLeadList = ({
                       </Dialog>
                     )}
                   </div>
-
                   {/* Edit and Close Buttons */}
                   <div className="flex gap-2">
                     <Button

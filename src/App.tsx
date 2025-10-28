@@ -91,7 +91,7 @@ const App = () => {
                 <Route path="blog" element={<BlogList />} />
                 {/* Update this route to use the new AddBlogPage component */}
                 <Route path="blog/add" element={<AddBlogPage />} /> {/* <--- CHANGED THIS LINE */}
-                <Route path="blog/edit/:slug" element={<EditBlog />} />
+                <Route path="blog/edit/:id" element={<EditBlog />} />
 
                 <Route path="support" element={<Support />} />
 

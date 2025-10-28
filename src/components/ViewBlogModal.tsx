@@ -36,10 +36,10 @@ export default function ViewBlogModal({ blog, isOpen, onClose }: ViewBlogModalPr
   // --- ADD THESE CONSOLE LOGS ---
   console.log("ViewBlogModal received blog object:", blog);
   if (blog) {
-      console.log("Brief Description:", blog.briefDescription);
-      console.log("Description (Full Content):", blog.description);
-      console.log("Type of briefDescription:", typeof blog.briefDescription, "Value:", blog.briefDescription);
-      console.log("Type of description:", typeof blog.description, "Value:", blog.description);
+    console.log("Brief Description:", blog.briefDescription);
+    console.log("Description (Full Content):", blog.description);
+    console.log("Type of briefDescription:", typeof blog.briefDescription, "Value:", blog.briefDescription);
+    console.log("Type of description:", typeof blog.description, "Value:", blog.description);
   }
   // --- END CONSOLE LOGS ---
 
@@ -80,15 +80,15 @@ export default function ViewBlogModal({ blog, isOpen, onClose }: ViewBlogModalPr
                 <span className="font-semibold">Slug:</span> {blog.slug}
               </div>
               <div className="flex items-center gap-2 col-span-1 md:col-span-2">
-                  <Globe className="h-5 w-5 text-blue-600" />
-                  <span className="font-semibold">Website:</span> {blog.website || 'N/A'}
+                <Globe className="h-5 w-5 text-blue-600" />
+                <span className="font-semibold">Website:</span> {blog.website || 'N/A'}
               </div>
               <div className="flex items-center gap-2 col-span-1 md:col-span-2">
-                  <Star className="h-5 w-5 text-yellow-500" />
-                  <span className="font-semibold">Is Featured:</span>
-                  <Badge className={blog.isFeatured === 'Yes' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                      {blog.isFeatured === 'Yes' ? 'Yes' : 'No'}
-                  </Badge>
+                <Star className="h-5 w-5 text-yellow-500" />
+                <span className="font-semibold">Is Featured:</span>
+                <Badge className={blog.isFeatured === 'Yes' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                  {blog.isFeatured === 'Yes' ? 'Yes' : 'No'}
+                </Badge>
               </div>
             </div>
           </div>
@@ -104,11 +104,11 @@ export default function ViewBlogModal({ blog, isOpen, onClose }: ViewBlogModalPr
 
           {/* Tags */}
           <div className="space-y-2 pt-4 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-purple-600" />
-                  Tags
-              </h3>
-              <div className="flex flex-wrap gap-2 pl-7">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <Tag className="h-5 w-5 text-purple-600" />
+              Tags
+            </h3>
+            {/* <div className="flex flex-wrap gap-2 pl-7">
                   {Array.isArray(blog.tags) && blog.tags.length > 0 ? (
                       blog.tags.map((tag, index) => (
                           <Badge key={index} className="bg-purple-100 text-purple-800 text-sm py-1 px-3">
@@ -118,7 +118,38 @@ export default function ViewBlogModal({ blog, isOpen, onClose }: ViewBlogModalPr
                   ) : (
                       <span className="text-gray-500">No tags available</span>
                   )}
-              </div>
+              </div> */}
+
+            <div className="flex flex-wrap gap-2 pl-7">
+              {/* Determine the tags source: an array or a comma-separated string */}
+              {(() => {
+                let tagsToDisplay: string[] = [];
+
+                if (Array.isArray(blog.tags) && blog.tags.length > 0) {
+                  // Case 1: blog.tags is already a non-empty array
+                  // Use 'as string[]' if blog.tags is typed as 'any' or 'unknown'
+                  tagsToDisplay = blog.tags as string[];
+                } else if (typeof blog.tags === 'string' && blog.tags.trim() !== '') {
+                  // Case 2: blog.tags is a non-empty string.
+                  tagsToDisplay = blog.tags
+                    .split(',') // Split only works on a string
+                    // Explicitly cast 'tag' to 'string' here to satisfy the compiler
+                    .map((tag: string) => tag.trim())
+                    .filter((tag: string) => tag.length > 0);
+                }
+
+                // Render the tags or the 'No tags available' message
+                if (tagsToDisplay.length > 0) {
+                  return tagsToDisplay.map((tag, index) => (
+                    <Badge key={index} className="bg-purple-100 text-purple-800 text-sm py-1 px-3">
+                      {tag}
+                    </Badge>
+                  ));
+                } else {
+                  return <span className="text-gray-500">No tags available</span>;
+                }
+              })()}
+            </div>
           </div>
 
           {/* Full Description */}
