@@ -150,7 +150,7 @@ if (Array.isArray(jobProfiles)) {
   ? sortedProfiles.filter((profile) => {
       const matchesSearch =
         profile.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        profile?.clientId?.name.toLowerCase().includes(searchTerm.toLowerCase());
+        profile?.clientId?.name?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus =
         statusFilter === "all" || profile.status === statusFilter;
       return matchesSearch && matchesStatus;

@@ -45,6 +45,13 @@ export const JobProfileForm = ({
     return d.toISOString().slice(0, 10);
   };
 
+  const branches = [
+    { label: "Jaipur, India", value: "Jaipur, India" },
+    { label: "Hyderabad, India", value: "Hyderabad, India" },
+    { label: "USA", value: "USA" },
+    { label: "Singapore", value: "Singapore" },
+  ];
+
   const [formData, setFormData] = useState({
     title: editData?.title || "",
     clientName: editData?.clientId?.name || "",
@@ -62,6 +69,9 @@ export const JobProfileForm = ({
     status: editData ? editData.status : "Active",
     jdFile: editData?.jd || "",
     candidateName: editData?.actionDetails?.candidateName || "",
+    openPositions: editData?.openPositions || 1,
+    location: editData?.location || "",
+    experience: editData?.experience || "",
   });
 
   useEffect(() => {
@@ -139,14 +149,14 @@ export const JobProfileForm = ({
     }
 
     // Validate Candidate Name
-    if (!formData.candidateName.trim()) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "candidateName is required.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!formData.candidateName.trim()) {
+    //   toast({
+    //     title: "⚠️ Missing Field",
+    //     description: "candidateName is required.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
     // Validate follow-up date
     if (!formData.followUpDate) {
       toast({
@@ -222,6 +232,9 @@ export const JobProfileForm = ({
       description: formData.description,
       // clientBudget: Number(formData.clientBudget.replace(/[^0-9.-]+/g, "")),
       clientBudget: Number(formData.clientBudget),
+      openPositions: Number(formData.openPositions),
+      location: formData.location,
+      experience: formData.experience,
       status: formData.status,
       // jd: formData.jdFile,
       jd: jdImageUrl,
@@ -232,6 +245,14 @@ export const JobProfileForm = ({
         markAsSend: formData.status === "Profile Sent",
       },
     };
+    if (!formData.location) {
+      toast({ title: "⚠️ Missing Field", description: "Branch location is required.", variant: "destructive" });
+      return;
+    }
+    if (!formData.experience) {
+      toast({ title: "⚠️ Missing Field", description: "Experience required is required.", variant: "destructive" });
+      return;
+    }
     console.log("Payload of Job Cration", payload);
     try {
       if (editData) {
@@ -561,6 +582,65 @@ export const JobProfileForm = ({
                     placeholder="Detailed job description, responsibilities, and requirements..."
                     className="border-gray-300 focus:border-gray-500 focus:ring-gray-500 rounded-lg resize-none"
                   />
+                </div>
+                {/* Open Positions */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-purple-600" />
+                    Open Positions
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={formData.openPositions}
+                    onChange={(e) => handleChange("openPositions", e.target.value)}
+                    placeholder="e.g. 2"
+                    className="h-12 border-gray-300 focus:border-purple-500 rounded-lg"
+                  />
+                </div>
+
+                {/* Location (Branch Dropdown) */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-blue-600" />
+                    Branch Location
+                  </Label>
+                  <Select
+                    value={formData.location}
+                    onValueChange={(value) => handleChange("location", value)}
+                  >
+                    <SelectTrigger className="h-12 border-gray-300 rounded-lg">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                      {branches.map((b) => (
+                        <SelectItem key={b.value} value={b.value}>
+                          {b.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Experience */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-orange-600" />
+                    Experience Required
+                  </Label>
+                  <Select
+                    value={formData.experience}
+                    onValueChange={(value) => handleChange("experience", value)}
+                  >
+                    <SelectTrigger className="h-12 border-gray-300 rounded-lg">
+                      <SelectValue placeholder="Select experience" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                      {["0-1 years", "1-2 years", "2-4 years", "4-6 years", "6-9 years", "9+ years"].map((exp) => (
+                        <SelectItem key={exp} value={exp}>{exp}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

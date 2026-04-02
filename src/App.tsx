@@ -20,6 +20,7 @@ import { ProjectLeadForm } from "./components/ProjectLeadForm";
 import {AllFollowUps} from "./components/AllFollowUps";
 
 import BlogList from './components/BlogList';
+import Applications from "./components/Applications";
 
 // Remove this line, as AddBlog.tsx is now AddSolarStationBlogForm.tsx
 // import AddBlog from './components/AddBlog'; // <--- REMOVE THIS LINE
@@ -79,6 +80,7 @@ const App = () => {
                   <Route path="edit/:id" element={<JobProfileForm onSave={() => { }} onCancel={() => { }} editData={null} />} />
                 </Route>
                 <Route path="analytics" element={<Analytics />} />
+                  <Route path="applications" element={<Applications />} />
 
                 {/* NEW: Blog Routes */}
                 <Route path="blog" element={<BlogList />} />

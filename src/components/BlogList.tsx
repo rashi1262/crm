@@ -674,7 +674,7 @@ export default function BlogList(): JSX.Element {
                     <Eye className="h-4 w-4" />
                   </Button>
                   {/* Edit button: Only enable if it's from a known editable source (e.g., solarstation.in) */}
-                  {blog.website === 'solarstation.in' && blog.slug && (
+                  {(blog.website === 'solarstation.in'|| blog.website === 'vidhema.com') && blog.slug && (
                     <Button
                       size="icon"
                       variant="outline"

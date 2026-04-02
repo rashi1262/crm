@@ -47,6 +47,7 @@ export const Sidebar = () => {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { id: "clients", label: "Client Management", icon: Users, path: "/clients" },
     { id: "jobs", label: "Job Profiles", icon: Briefcase, path: "/jobs" },
+    { id: "applications", label: "Applications", icon: Users, path: "/applications" },
     { id: "projectleads", label: "Project Leads", icon: UserCheck, path: "/projects" },
     { id: "analytics", label: "Analytics", icon: BarChart, path: "/analytics" },
     { id: "blog", label: "Blogs", icon: Newspaper, path: "/blog" },
