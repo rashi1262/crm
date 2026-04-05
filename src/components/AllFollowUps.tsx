@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Input } from "./ui/input";
+const baseURL = import.meta.env.VITE_API_URL;
 
 interface Client {
   mobileNo: string;
@@ -89,7 +90,7 @@ interface JobProfile {
   clientBudget: number;
   status: string;
   jd?: string;
-
+  
   actionDetails?: ActionDetails;
   interviewActionDetails?: InterviewActionDetails;
   // sentProfiles?: SentProfile[];
@@ -136,6 +137,7 @@ interface ProjectProfile {
 
 export const AllFollowUps = () => {
   const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
+  const [newFollowUp, setNewFollowUp] = useState<any[]>([]);
 
   const [filterForm, setFilterForm] = useState({
     contactPersonName: "",
@@ -143,6 +145,7 @@ export const AllFollowUps = () => {
     startfollowUpDate: "",
     endfollowUpDate: "",
     searchOf: "Client-Follow-Ups",
+    contactPersonId: "",
   });
 
   const [ViewContent, setViewContent] = useState<any | null>(null);
@@ -195,9 +198,9 @@ export const AllFollowUps = () => {
 
     const contactPersonMatch = contactPersonFilter
       ? job.contactPersonName
-          ?.toLowerCase()
-          .trim()
-          .includes(contactPersonFilter)
+        ?.toLowerCase()
+        .trim()
+        .includes(contactPersonFilter)
       : true;
 
     // --- Date Filtering ---
@@ -268,8 +271,8 @@ export const AllFollowUps = () => {
   const handleChange = (field: string, value: string) => {
     setFilterForm((prev) => ({ ...prev, [field]: value }));
   };
-  
-  
+
+
   const getAllClients = async () => {
     try {
       const response = await axios.get(`${baseURL}/clients`);
@@ -305,8 +308,7 @@ export const AllFollowUps = () => {
 
     return null;
   };
-  const baseURL = import.meta.env.VITE_API_URL;
-
+  
   const getJobsData = async () => {
     try {
       const response = await axios.get(
@@ -876,6 +878,100 @@ export const AllFollowUps = () => {
 
   console.log("New upcoing followup client", newupcomingFollowups);
   console.log("Next followup next followup client", nextFollowupClient);
+
+  const filteredNewFollowups = newFollowUp.filter((followup) => {
+    const clientNameFilter =
+      filterForm.clientName === "All-Client"
+        ? ""
+        : filterForm.clientName.trim().toLowerCase();
+
+    const contactPersonFilter = filterForm.contactPersonName
+      .trim()
+      .toLowerCase();
+
+    // ✅ Match client name inside followup.clientId.name
+    const clientMatch = clientNameFilter
+      ? followup.clientId?.name?.toLowerCase().includes(clientNameFilter)
+      : true;
+
+    // ✅ Match contact person inside followup.contactPersonId.fullName
+    const contactMatch = contactPersonFilter
+      ? followup.contactPersonId?.fullName
+        ?.toLowerCase()
+        .includes(contactPersonFilter)
+      : true;
+
+    // Date filtering (same logic as before)
+    let startDate = filterForm.startfollowUpDate
+      ? new Date(filterForm.startfollowUpDate)
+      : null;
+
+    let endDate = filterForm.endfollowUpDate
+      ? new Date(filterForm.endfollowUpDate)
+      : null;
+
+    if (startDate) {
+      startDate = new Date(
+        Date.UTC(
+          startDate.getUTCFullYear(),
+          startDate.getUTCMonth(),
+          startDate.getUTCDate(),
+          0,
+          0,
+          0,
+          0
+        )
+      );
+    }
+
+    if (endDate) {
+      endDate = new Date(
+        Date.UTC(
+          endDate.getUTCFullYear(),
+          endDate.getUTCMonth(),
+          endDate.getUTCDate(),
+          23,
+          59,
+          59,
+          999
+        )
+      );
+    }
+
+    const followupTime = new Date(followup.followUpDate);
+    const dateMatch =
+      (!startDate || followupTime >= startDate) &&
+      (!endDate || followupTime <= endDate);
+
+    const match = clientMatch && contactMatch && dateMatch;
+
+    console.log(
+      `Filtering followup for client "${followup.clientId?.name}" | contact: ${followup.contactPersonId?.fullName} | clientMatch: ${clientMatch} | contactMatch: ${contactMatch} | dateMatch ${dateMatch} | finalMatch: ${match}`
+    );
+
+    return match;
+  });
+
+  const indexOfLastNewFollowup = currentPage * itemsPerPage;
+  const indexOfFirstNewFollowup = indexOfLastNewFollowup - itemsPerPage;
+  const currentNewFollowups = filteredNewFollowups.slice(
+    indexOfFirstNewFollowup,
+    indexOfLastNewFollowup
+  );
+  const totalNewFollowupPages = Math.ceil(filteredNewFollowups.length / itemsPerPage);
+  console.log("Filtered New Followups:", filteredNewFollowups);
+
+  // get all new followup
+  const getNewFollowUp = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/newfollowups`);
+      setNewFollowUp(response.data.data);
+      console.log(`All new followup Data `, newFollowUp);
+    } catch (err) {
+      console.log("Failed to fetch all new followup", err);
+    }
+  };
+
   useEffect(() => {
     getAllClients();
   }, []);
@@ -887,6 +983,8 @@ export const AllFollowUps = () => {
       getProjectData();
     } else if (filterForm.searchOf === "Client-Follow-Ups") {
       getClientData();
+    } else if (filterForm.searchOf === "New-Follow-Ups") {
+      getNewFollowUp();
     }
     setCurrentPage(1);
   }, [
@@ -896,6 +994,23 @@ export const AllFollowUps = () => {
     filterForm.startfollowUpDate,
     filterForm.endfollowUpDate,
   ]);
+  
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+  const getAllAdminUsers = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/getAdminUsers`);
+      setAdminUsers(response.data); // 👈 adminUsers state update karna hai
+      console.log("Admin Users:", response.data);
+    } catch (error) {
+      console.log("Error fetching admin users:", error);
+    }
+  };
+
+  getAllAdminUsers();
+}, []);
+
 
   const formatFollowupDate = (datetime: string, showFullDate = false) => {
     const date = new Date(datetime);
@@ -944,7 +1059,7 @@ export const AllFollowUps = () => {
   console.log("all job data", jobsValue);
 
   return (
-    <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6">
+    <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6 max-w-[80vw] mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -961,10 +1076,6 @@ export const AllFollowUps = () => {
       </div>
 
       {/* input filter for searching the api */}
-
-      {/* <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Filter Follow-Ups
-        </h2> */}
       <div className="relative bg-white p-6 rounded-xl shadow-md border border-gray-200 mb-4 overflow-x-auto">
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <Filter className="h-5 w-5 text-blue-600" />
@@ -986,7 +1097,7 @@ export const AllFollowUps = () => {
                 {filterForm.clientName ? (
                   <span>{filterForm.clientName}</span>
                 ) : (
-                  <span className="text-gray-400">Select a client</span>
+                  <span className="text-gray-400">Select a client ↓</span>
                 )}
               </SelectTrigger>
               <SelectValue placeholder="" />
@@ -1014,21 +1125,46 @@ export const AllFollowUps = () => {
             </Select>
           </div>
 
-          {/* Contact Person */}
-          <div className="flex flex-col gap-1 min-w-[200px]">
-            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <User className="h-4 w-4 text-blue-600" />
-              Contact Person
-            </Label>
-            <Input
-              value={filterForm.contactPersonName}
-              onChange={(e) =>
-                handleChange("contactPersonName", e.target.value)
-              }
-              className="h-10 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter name"
-            />
-          </div>
+{/* Contact Person */}
+<div className="flex flex-col gap-1 min-w-[220px]">
+  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+    <User className="h-4 w-4 text-blue-600" />
+  
+    Contact Person
+  </Label>
+
+  <Select
+    value={filterForm.contactPersonId}
+    onValueChange={(val) => handleChange("contactPersonId", val)}
+    
+  >
+    <SelectTrigger className="h-11 px-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white shadow-sm hover:shadow-md">
+      <SelectValue>
+        {adminUsers.find((u) => u._id === filterForm.contactPersonId)?.fullName ||
+          "Select contact person"}
+      </SelectValue>
+    </SelectTrigger>
+
+    <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+      {adminUsers.length > 0 ? (
+        adminUsers.map((user) => (
+          <SelectItem
+            key={user._id}
+            value={user._id}
+            className="px-3 py-2 rounded-lg cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors"
+          >
+            {user.fullName || user.name || user.username || user.email}
+          </SelectItem>
+        ))
+      ) : (
+        <SelectItem value="no-users" disabled>
+          No users found
+        </SelectItem>
+      )}
+    </SelectContent>
+  </Select>
+</div>
+
 
           {/* Start Date */}
           <div className="flex flex-col gap-1 min-w-[200px]">
@@ -1101,6 +1237,12 @@ export const AllFollowUps = () => {
                   className="py-2 px-4 hover:bg-blue-50 rounded"
                 >
                   Project Follow-Ups
+                </SelectItem>
+                <SelectItem
+                  value="New-Follow-Ups"
+                  className="py-2 px-4 hover:bg-blue-50 rounded"
+                >
+                  New Follow-Ups
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -1175,8 +1317,8 @@ export const AllFollowUps = () => {
                               </span>{" "}
                               {job?.actionDetails?.followUpDate
                                 ? new Date(job.actionDetails.followUpDate)
-                                    .toISOString()
-                                    .split("T")[0]
+                                  .toISOString()
+                                  .split("T")[0]
                                 : "N/A"}
                             </p>
 
@@ -1290,8 +1432,8 @@ export const AllFollowUps = () => {
                               </span>{" "}
                               {project?.actionDetails?.followUpDate
                                 ? new Date(
-                                    project.actionDetails.followUpDate
-                                  ).toLocaleDateString()
+                                  project.actionDetails.followUpDate
+                                ).toLocaleDateString()
                                 : "N/A"}
                             </p>
 
@@ -1404,8 +1546,8 @@ export const AllFollowUps = () => {
                               </span>{" "}
                               {client.nextFollowup
                                 ? new Date(
-                                    client.nextFollowup
-                                  ).toLocaleDateString()
+                                  client.nextFollowup
+                                ).toLocaleDateString()
                                 : "N/A"}
                             </p>
 
@@ -1458,6 +1600,84 @@ export const AllFollowUps = () => {
               )}
             </>
           )}
+
+          {/* ======= NEW FOLLOWUP VIEW ======= */}
+          {filterForm.searchOf === "New-Follow-Ups" && (
+            <>
+              {filteredNewFollowups.length === 0 ? (
+                <p className="text-gray-500 text-center mt-6">
+                  No new follow-ups found.
+                </p>
+              ) : (
+                <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                    {filteredNewFollowups
+                      .slice() // make a shallow copy
+                      .reverse() // latest first
+                      .slice(indexOfFirstClient, indexOfLastClient)
+                      .map((followup) => (
+                        <div
+                          key={followup.id}
+                          className="bg-white shadow-xl p-6 rounded-xl border border-gray-200 hover:shadow-2xl transition-all duration-300"
+                        >
+                          <h3 className="text-xl font-semibold text-green-700 mb-4 truncate">
+                            {followup.clientId.name || "Unnamed Client"}
+                          </h3>
+
+                          <div className="space-y-2 text-sm text-gray-700">
+                            <p>
+                              <span className="font-medium">Status:</span>{" "}
+                              {followup.status || "N/A"}
+                            </p>
+                            <p>
+                              <span className="font-medium">Contact Person:</span>{" "}
+                              {followup.contactPersonId.fullName || "N/A"}
+                            </p>
+                            <p>
+                              <span className="font-medium">Email:</span>{" "}
+                              {followup.contactPersonId.email || "N/A"}
+                            </p>
+                            <p>
+                              <span className="font-medium">Follow-up Date:</span>{" "}
+                              {followup?.followUpDate
+                                ? new Date(followup.followUpDate).toLocaleDateString()
+                                : "N/A"}
+                            </p>
+
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex justify-center items-center gap-4 mt-8">
+                    <button
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      className="px-4 py-2 bg-gray-200 text-sm rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+
+                    <span className="text-sm font-medium">
+                      Page {currentPage} of {totalNewFollowupPages}
+                    </span>
+
+                    <button
+                      disabled={currentPage === totalNewFollowupPages}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalNewFollowupPages))
+                      }
+                      className="px-4 py-2 bg-gray-200 text-sm rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
         </div>
       </div>
     </div>

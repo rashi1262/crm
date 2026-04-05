@@ -7,6 +7,7 @@ import {
   UserCheck,
   Newspaper,
   Calendar,
+  HelpCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -52,6 +53,8 @@ export const Sidebar = () => {
     { id: "analytics", label: "Analytics", icon: BarChart, path: "/analytics" },
     { id: "blog", label: "Blogs", icon: Newspaper, path: "/blog" },
     { id: "allfollowup", label: "All Follow Ups", icon: Calendar, path: "/allfollowup" },
+    { id: "addMeeting", label: "Schedule Meetings", icon: Calendar, path: "/addfollowup" },
+    { id: "vidhemaSupport", label: "Vidhema Support", icon: HelpCircle, path: "/support" }
   ];
 
   useEffect(()=>{
@@ -73,8 +76,9 @@ export const Sidebar = () => {
   return (
     <>
       <div className="fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 shadow-2xl z-50 flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-700">
+        
+        {/* Header - Fixed Top */}
+        <div className="p-4 border-b border-slate-700">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             JobFlow
           </h1>
@@ -82,7 +86,9 @@ export const Sidebar = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="mt-8 px-4 flex-grow overflow-y-auto custom-scrollbar">
+        <nav className="mt-3 px-4 flex-grow overflow-y-auto custom-scrollbar">
+          
+          {/* Menu Items */}
           <div className="space-y-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -103,36 +109,34 @@ export const Sidebar = () => {
               );
             })}
           </div>
+
+          <div className="mt-2 space-y-4">
+            <div
+              onClick={handleUserClick}
+              className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-3 border border-slate-700 cursor-pointer hover:bg-slate-700"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" />
+                <div>
+                  <p className="text-sm font-medium text-white">{user.name}</p>
+                  <p className="text-xs text-slate-400">{user.email}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Logout Button */}
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-3 border border-slate-700">
+              <div className="flex items-center space-x-3">
+                <div
+                  onClick={handleLogout}
+                  className="text-sm font-medium text-white cursor-pointer transition duration-200 hover:text-gray-300 active:text-gray-400"
+                >
+                  Logout
+                </div>
+              </div>
+            </div>
+          </div>          
         </nav>
-
-        {/* User Info & Logout */}
-        <div className="p-4 space-y-4">
-          {/* User Box */}
-          <div
-            onClick={handleUserClick}
-            className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-4 border border-slate-700 cursor-pointer hover:bg-slate-700"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" />
-              <div>
-                <p className="text-sm font-medium text-white">{user.name}</p>
-                <p className="text-xs text-slate-400">{user.email}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Logout Button */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-4 border border-slate-700">
-            <div className="flex items-center space-x-3">
-              <div
-                onClick={handleLogout}
-                className="text-sm font-medium text-white cursor-pointer transition duration-200 hover:text-gray-300 active:text-gray-400"
-              >
-                Logout
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Modal Outside Sidebar */}

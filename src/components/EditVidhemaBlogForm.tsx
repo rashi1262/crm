@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,27 +19,27 @@ import {
   Hash,
   ClipboardList,
   BookOpen,
+  ArrowLeft,
 } from "lucide-react";
 import RichTextEditorField from "./RichTextEditorField.";
+const baseURL = import.meta.env.VITE_API_URL;
 
-export default function AddVidhemaBlogForm(): JSX.Element {
+export default function EditVidhemaBlogForm(): JSX.Element {
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
 
   const [authors, setAuthors] = useState<{ _id: string; name: string }[]>([]);
-  const [categories, setCategories] = useState<
-    { _id: string; title: string }[]
-  >([]);
+  const [categories, setCategories] = useState<{ _id: string; title: string }[]>([]);
 
-  const vidhemaAccessToken =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVmMGMxMDY1NGM1ZDUwMGY2NDM3YmQzMSIsImVtYWlsIjoic2FsZXNAdmlkaGVtYS5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTI2NDQyNjIsImV4cCI6MTc1MjczMDY2Mn0.mpg--uAlcSkTXMWTZShBgq-p58gnlgPDv9bs8zniY8E";
+  const vidhemaAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVmMGMxMDY1NGM1ZDUwMGY2NDM3YmQzMSIsImVtYWlsIjoic2FsZXNAdmlkaGVtYS5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTI2NDQyNjIsImV4cCI6MTc1MjczMDY2Mn0.mpg--uAlcSkTXMWTZShBgq-p58gnlgPDv9bs8zniY8E";
 
   const [formData, setFormData] = useState({
     title: "",
     shortDescription: "",
     description: "",
-    otherDetails: [] as any[],
     authorId: "none",
     backgroundImage: "",
     categoryids: [] as string[],
@@ -61,138 +61,93 @@ export default function AddVidhemaBlogForm(): JSX.Element {
 
   // State for image files and previews
   const [featuredImageFile, setFeaturedImageFile] = useState<File | null>(null);
-  const [featuredImagePreviewUrl, setFeaturedImagePreviewUrl] = useState<
-    string | null
-  >(null);
-  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(
-    null
-  );
-  const [backgroundImagePreviewUrl, setBackgroundImagePreviewUrl] = useState<
-    string | null
-  >(null);
+  const [featuredImagePreviewUrl, setFeaturedImagePreviewUrl] = useState<string | null>(null);
+  const [backgroundImageFile, setBackgroundImageFile] = useState<File | null>(null);
+  const [backgroundImagePreviewUrl, setBackgroundImagePreviewUrl] = useState<string | null>(null);
 
   // State for raw string inputs
   const [vidhemaTagsInput, setVidhemaTagsInput] = useState("");
   const [faqInput, setFaqInput] = useState("");
 
-  const baseURL = import.meta.env.VITE_API_URL;
+  // Fetch blog data by slug
+  useEffect(() => {
+    const fetchBlogData = async () => {
+      if (!slug) return;
 
-// Updated handleChange to support both input/textarea and JoditEditor
-const handleChange = (
-  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string,
-  editorValue?: string
-) => {
-  // Case 1: If called from RichTextEditorField
-  if (typeof e === "string" && editorValue !== undefined) {
-    const id = e; // "description" or field name
-    const value = editorValue;
+      try {
+        setFetching(true);
+        const response = await fetch(`${baseURL}/blogs/slug/${slug}`, {
+          headers: {
+            'access_token': vidhemaAccessToken,
+            'Content-Type': 'application/json',
+          },
+        });
 
-    setFormData((prev) => ({ ...prev, [id]: value }));
-    return;
-  }
+        if (!response.ok) {
+          throw new Error("Failed to fetch blog data");
+        }
 
-  // Case 2: Normal input/textarea
-  const { id, value } = (e as React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>).target;
+        const blogData = await response.json();
 
-  if (id.startsWith("metatags.")) {
-    const key = id.split(".")[1];
-    setFormData((prev) => ({
-      ...prev,
-      metatags: { ...prev.metatags, [key]: value },
-    }));
-  } else {
-    setFormData((prev) => ({ ...prev, [id]: value }));
-  }
-};
+        if (blogData.success && blogData.data) {
+          const data = blogData.data;
 
-  const handleVidhemaTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setVidhemaTagsInput(value);
-    setFormData((prev) => ({
-      ...prev,
-      metatags: { ...prev.metatags, Keyword: value },
-    }));
-  };
+          setFormData({
+            title: data.title || "",
+            shortDescription: data.shortDescription || "",
+            description: data.description || "",
+            authorId: data.authorId?._id || "none",
+            backgroundImage: data.background_image || "",
+            categoryids: data.categoryids?.map((cat: any) => cat._id) || [],
+            date: data.date ? new Date(data.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+            featured_image: data.featured_image || "",
+            metatags: data.metatags || {
+              title: "",
+              description: "",
+              Keyword: "",
+              imgUrl: "",
+              imgAlt: "",
+              imgTitle: "",
+            },
+            status: data.status !== undefined ? data.status : true,
+            technology: data.technology || "",
+            url: data.url || "",
+            faq: data.faq || [],
+          });
 
-  const handleFaqChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setFaqInput(value);
-    setFormData((prev) => ({
-      ...prev,
-      faq: value
-        .split("\n")
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0),
-    }));
-  };
+          if (data.metatags?.Keyword) {
+            setVidhemaTagsInput(data.metatags.Keyword);
+          }
 
-  const handleFeaturedImageFileChange = (e) => {
-    const file = e.target.files?.[0];
-    setFeaturedImageFile(file || null);
-  };
+          if (data.faq && Array.isArray(data.faq)) {
+            setFaqInput(data.faq.join("\n"));
+          }
 
-  const handleBackgroundImageFileChange = (e) => {
-    const file = e.target.files?.[0];
-    setBackgroundImageFile(file || null);
-  };
+          if (data.featured_image) {
+            setFeaturedImagePreviewUrl(data.featured_image);
+          }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append("title", formData.title);
-      formDataToSend.append("url", formData.url);
-      formDataToSend.append("shortDescription", formData.shortDescription);
-      formDataToSend.append("description", formData.description);
-      formDataToSend.append("technology", formData.technology);
-      formDataToSend.append("authorId", formData.authorId);
-      formDataToSend.append("date", formData.date);
-      formDataToSend.append("status", formData.status ? "true" : "false");
-      formDataToSend.append("categoryids[]", formData.categoryids[0]);
-
-      // Meta tags
-      Object.keys(formData.metatags).forEach((key) => {
-        formDataToSend.append(`metatags[${key}]`, formData.metatags[key]);
-      });
-
-      // FAQ array
-      formData.faq.forEach((item, index) => {
-        formDataToSend.append(`faq[${index}]`, item);
-      });
-
-      // Images (files)
-      if (featuredImageFile) {
-        formDataToSend.append("featured_image", featuredImageFile);
+          if (data.background_image) {
+            setBackgroundImagePreviewUrl(data.background_image);
+          }
+        }
+      } catch (err: any) {
+        console.error("Error fetching blog:", err);
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load blog data",
+          variant: "destructive",
+        });
+        navigate("/blog");
+      } finally {
+        setFetching(false);
       }
-      if (backgroundImageFile) {
-        formDataToSend.append("background_image", backgroundImageFile);
-      }
+    };
 
-      const response = await fetch(`${baseURL}/blogs`, {
-        method: "POST",
-        headers: {
-          access_token: vidhemaAccessToken,
-        },
-        body: formDataToSend,
-      });
+    fetchBlogData();
+  }, [slug, baseURL, vidhemaAccessToken, navigate, toast]);
 
-      if (!response.ok) throw new Error("Failed to save blog");
-
-      toast({ title: "Success", description: "Blog added successfully" });
-      navigate("/blog");
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: err.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch authors and categories
   useEffect(() => {
     const fetchAuthorsAndCategories = async () => {
       try {
@@ -215,22 +170,194 @@ const handleChange = (
         setCategories(categoriesData.data || []);
       } catch (err) {
         console.error(err);
+        toast({
+          title: "Error",
+          description: "Failed to load authors or categories",
+          variant: "destructive",
+        });
       }
     };
 
     fetchAuthorsAndCategories();
-  }, [baseURL, vidhemaAccessToken]);
+  }, [baseURL, vidhemaAccessToken, toast]);
+
+  // Updated handleChange to support both input/textarea and JoditEditor
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string,
+    editorValue?: string
+  ) => {
+    // Case 1: If called from RichTextEditorField
+    if (typeof e === "string" && editorValue !== undefined) {
+      const id = e; // "description" or field name
+      const value = editorValue;
+
+      setFormData((prev) => ({ ...prev, [id]: value }));
+      return;
+    }
+
+    // Case 2: Normal input/textarea
+    const { id, value } = (e as React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>).target;
+
+    if (id.startsWith("metatags.")) {
+      const key = id.split(".")[1];
+      setFormData((prev) => ({
+        ...prev,
+        metatags: { ...prev.metatags, [key]: value },
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [id]: value }));
+    }
+  };
+
+  const handleVidhemaTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setVidhemaTagsInput(value);
+    setFormData((prev) => ({
+      ...prev,
+      metatags: { ...prev.metatags, Keyword: value },
+    }));
+  };
+
+  const handleFaqChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setFaqInput(value);
+    setFormData((prev) => ({
+      ...prev,
+      faq: value
+        .split("\n")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    }));
+  };
+
+  const handleFeaturedImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setFeaturedImageFile(file);
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFeaturedImagePreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFeaturedImagePreviewUrl(null);
+    }
+  };
+
+  const handleBackgroundImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setBackgroundImageFile(file);
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setBackgroundImagePreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setBackgroundImagePreviewUrl(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append("title", formData.title);
+      formDataToSend.append("url", formData.url);
+      formDataToSend.append("shortDescription", formData.shortDescription);
+      formDataToSend.append("description", formData.description);
+      formDataToSend.append("technology", formData.technology);
+      formDataToSend.append("authorId", formData.authorId);
+      formDataToSend.append("date", formData.date);
+      formDataToSend.append("status", formData.status ? "true" : "false");
+
+      // Append each category ID
+      formData.categoryids.forEach(id => {
+        formDataToSend.append("categoryids[]", id);
+      });
+
+      // Meta tags
+      Object.keys(formData.metatags).forEach((key) => {
+        const value = formData.metatags[key as keyof typeof formData.metatags];
+        formDataToSend.append(`metatags[${key}]`, value);
+      });
+
+      // FAQ array
+      formData.faq.forEach((item, index) => {
+        formDataToSend.append(`faq[${index}]`, item);
+      });
+
+      // Images (files) - only append if they've been changed
+      if (featuredImageFile) {
+        formDataToSend.append("featured_image", featuredImageFile);
+      }
+      if (backgroundImageFile) {
+        formDataToSend.append("background_image", backgroundImageFile);
+      }
+
+      const response = await fetch(`${baseURL}/blogs/edit/${slug}`, {
+        method: "PUT",
+        headers: {
+          access_token: vidhemaAccessToken,
+        },
+        body: formDataToSend,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update blog");
+      }
+
+      toast({
+        title: "Success",
+        description: "Blog updated successfully"
+      });
+      navigate("/blog");
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetching) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading blog data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 mb-6 w-full">
-        <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Add New Blog Post to vidhema.com
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Fill in the details for a new blog entry on vidhema.com.
-          </p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/blog")}
+            className="flex items-center gap-1"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Blogs
+          </Button>
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Edit Blog Post
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Update the details for this blog entry on vidhema.com.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -300,7 +427,6 @@ const handleChange = (
               name="description"
               value={formData.description}
               onChange={handleChange}
-
               placeholder="The detailed content of the blog post"
             />
           </div>
@@ -324,15 +450,13 @@ const handleChange = (
               htmlFor="featuredImageUpload"
               className="flex items-center gap-1"
             >
-              <Image className="h-4 w-4 text-teal-500" /> Featured Image{" "}
-              <span className="text-red-500">*</span>
+              <Image className="h-4 w-4 text-teal-500" /> Featured Image
             </Label>
             <Input
               id="featuredImageUpload"
               type="file"
               accept="image/*"
               onChange={handleFeaturedImageFileChange}
-              required
               className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
             {featuredImagePreviewUrl && (
@@ -342,7 +466,9 @@ const handleChange = (
                   alt="Featured Image Preview"
                   className="max-w-full h-auto max-h-48 rounded-md object-contain shadow-md"
                 />
-                <p className="text-sm text-gray-500 mt-2">Local preview.</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  {featuredImageFile ? "New image preview" : "Current image"}
+                </p>
               </div>
             )}
           </div>
@@ -369,7 +495,9 @@ const handleChange = (
                   alt="Background Image Preview"
                   className="max-w-full h-auto max-h-48 rounded-md object-contain shadow-md"
                 />
-                <p className="text-sm text-gray-500 mt-2">Local preview.</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  {backgroundImageFile ? "New image preview" : "Current image"}
+                </p>
               </div>
             )}
           </div>
@@ -390,12 +518,12 @@ const handleChange = (
 
           {/* Author */}
           <div className="space-y-2">
-            <Label htmlFor="select_author" className="flex items-center gap-1">
+            <Label htmlFor="authorId" className="flex items-center gap-1">
               <Tag className="h-4 w-4 text-gray-500" /> Author{" "}
               <span className="text-red-500">*</span>
             </Label>
             <select
-              id="select_author"
+              id="authorId"
               value={formData.authorId}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, authorId: e.target.value }))
@@ -403,7 +531,7 @@ const handleChange = (
               required
               className="border border-gray-300 rounded-md p-2 w-full"
             >
-              <option value="">Select an Author</option>
+              <option value="none">Select an Author</option>
               {authors.map((author) => (
                 <option key={author._id} value={author._id}>
                   {author.name}
@@ -415,14 +543,14 @@ const handleChange = (
           {/* Category */}
           <div className="space-y-2">
             <Label
-              htmlFor="select_category"
+              htmlFor="categoryids"
               className="flex items-center gap-1"
             >
               <Tag className="h-4 w-4 text-gray-500" /> Category{" "}
               <span className="text-red-500">*</span>
             </Label>
             <select
-              id="select_category"
+              id="categoryids"
               value={formData.categoryids[0] || ""}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -529,10 +657,19 @@ const handleChange = (
           </div>
         </div>
 
-        <Button type="submit" disabled={loading} className="w-full md:w-auto">
-          <Save className="mr-2 h-4 w-4" />{" "}
-          {loading ? "Saving..." : "Save Blog"}
-        </Button>
+        <div className="flex gap-4">
+          <Button type="submit" disabled={loading}>
+            <Save className="mr-2 h-4 w-4" />{" "}
+            {loading ? "Updating..." : "Update Blog"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate("/blog")}
+          >
+            Cancel
+          </Button>
+        </div>
       </form>
     </div>
   );

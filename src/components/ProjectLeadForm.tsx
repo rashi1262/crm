@@ -28,6 +28,7 @@ import {
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+const baseURL = import.meta.env.VITE_API_URL;
 
 interface ProjectProfileFormProps {
   onSave: () => void;
@@ -41,11 +42,22 @@ export const ProjectLeadForm = ({
   editData,
 }: ProjectProfileFormProps) => {
   const [clients, setClients] = useState<{ _id: string; name: string }[]>([]);
+  const [adminUsers, setAdminUsers] = useState([]);
+  // const formatDate = (dateStr: string) => {
+  //   if (!dateStr) return "";
+  //   const d = new Date(dateStr);
+  //   if (isNaN(d.getTime())) return "";
+  //   return d.toISOString().slice(0, 10);
+  // };
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return "";
-    return d.toISOString().slice(0, 10);
+
+    // The toISOString() method returns a string in the format "YYYY-MM-DDTHH:mm:ss.sssZ"
+    // We need to slice it to "YYYY-MM-DDTHH:mm" to be compatible with datetime-local
+    return d.toISOString().slice(0, 16);
   };
 
   const [formData, setFormData] = useState({
@@ -54,6 +66,7 @@ export const ProjectLeadForm = ({
     contactPersonName: editData?.contactPersonName || "",
     followUpDate: formatDate(editData?.actionDetails?.followUpDate || ""),
     clientBudget: editData?.clientBudget || "",
+    contactPersonId: editData?.actionDetails?.employeeId || "",
     // skills: editData?.skills
     //   ? Array.isArray(editData.skills)
     //     ? editData.skills.join(", ")
@@ -102,50 +115,82 @@ export const ProjectLeadForm = ({
     }));
   };
 
-  // this for the skill enter and delet
   const handleSkillKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       const input = e.currentTarget.value.trim();
-      if (input && !formData.skills.includes(input)) {
-        setFormData((prev) => ({
+
+      if (input) {
+        const skillsToAdd = input.split(",").map(s => s.trim()).filter(Boolean);
+
+        setFormData(prev => ({
           ...prev,
-          skills: [...prev.skills, input],
+          skills: Array.from(new Set([...prev.skills, ...skillsToAdd])),
         }));
+
         e.currentTarget.value = "";
       }
     }
   };
 
+  // Add skills if user pastes or clicks away
+  const handleSkillBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const input = e.currentTarget.value.trim();
+    if (input) {
+      const skillsToAdd = input.split(",").map(s => s.trim()).filter(Boolean);
+      setFormData(prev => ({
+        ...prev,
+        skills: Array.from(new Set([...prev.skills, ...skillsToAdd])),
+      }));
+      e.currentTarget.value = "";
+    }
+  };
+
   const removeSkill = (skillToRemove: string) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      skills: prev.skills.filter((skill) => skill !== skillToRemove),
+      skills: prev.skills.filter(skill => skill !== skillToRemove),
     }));
   };
 
   useEffect(() => {
-    const getAllClients = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get(`${baseURL}/clients`);
-        setClients(response.data.data);
-        console.log(
-          "This is project getting  data through projectlead form page",
-          response.data.data
-        );
-        console.log(response.data.data, "client data");
+        const [clientsRes, adminUsersRes] = await Promise.all([
+          axios.get(`${baseURL}/clients?filter={"all":true}`),
+          axios.get(`${baseURL}/getAdminUsers`),
+        ]);
+
+        setClients(clientsRes.data.data);
+        const fetchedAdminUsers = adminUsersRes.data;
+        console.log("Fetched Admin Users:", fetchedAdminUsers);
+        setAdminUsers(fetchedAdminUsers);
+
+        if (editData && editData.actionDetails?.employeeId) {
+          const contactPerson = fetchedAdminUsers.find(
+            (user) => user._id === editData.actionDetails.employeeId
+          );
+
+          console.log("Contact Person:", contactPerson);
+          if (contactPerson) {
+            setFormData((prev) => ({
+              ...prev,
+              contactPersonId: editData.actionDetails.employeeId,
+              contactPersonName: contactPerson.fullName || contactPerson.name || contactPerson.username,
+            }));
+          }
+        }
       } catch (error) {
-        console.log("error", error);
+        console.error("Error fetching data:", error);
       }
     };
-    getAllClients();
-  }, []);
+
+    fetchData();
+  }, [editData]);
 
   const navigate = useNavigate();
 
   // getting the env data of the api
-
-  const baseURL = import.meta.env.VITE_API_URL;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,17 +257,16 @@ export const ProjectLeadForm = ({
       return;
     }
 
-     let projectDescribeImageUrl=typeof formData.projectDescriptionFile==='string' ? formData.projectDescriptionFile : "";
-    
-        if(formData.projectDescriptionFile instanceof File)
-        {
-           const uploadData=new FormData()
-           uploadData.append("image", formData.projectDescriptionFile); 
-           try {
+    let projectDescribeImageUrl = typeof formData.projectDescriptionFile === 'string' ? formData.projectDescriptionFile : "";
+
+    if (formData.projectDescriptionFile instanceof File) {
+      const uploadData = new FormData()
+      uploadData.append("image", formData.projectDescriptionFile);
+      try {
         const res = await axios.post(`${baseURL}/upload`, uploadData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        console.log('Response of image upload',res.data)
+        console.log('Response of image upload', res.data)
         projectDescribeImageUrl = res.data.imageUrl;
       } catch (uploadErr) {
         console.error("Upload failed:", uploadErr);
@@ -233,15 +277,7 @@ export const ProjectLeadForm = ({
         });
         return;
       }
-        }
-    
-      // console.log("Raw Followup date creation of Project (local):",formData.followUpDate);
-      // console.log("Udate followupdate in creation of Project", formData.followUpDate);
-
-      // // convert localdateandtime to utc for consistency db
-      // const utcDateStr=new Date(formData.followUpDate).toISOString()
-      // // converted utcDateStr
-      //  console.log("Converted to UTC in Project  creation :", utcDateStr);
+    }
 
     const payload = {
       clientId: selectedClient._id,
@@ -255,9 +291,10 @@ export const ProjectLeadForm = ({
       // clientBudget: Number(formData.clientBudget.replace(/[^0-9.-]+/g, "")),
       clientBudget: Number(formData.clientBudget),
       status: formData.status,
-      projectDescription:projectDescribeImageUrl,
+      projectDescription: projectDescribeImageUrl,
       actionDetails: {
         teamName: formData.teamName,
+        employeeId: formData.contactPersonId,
         followUpDate: formData.followUpDate,
         // followUpDate: utcDateStr,
         lastfollowUpDate: formData.followUpDate || new Date().toISOString(), // Safe fallback
@@ -321,6 +358,17 @@ export const ProjectLeadForm = ({
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleContactPersonChange = (selectedId) => {
+    const selectedUser = adminUsers.find(user => user._id === selectedId);
+    if (selectedUser) {
+      setFormData(prev => ({
+        ...prev,
+        contactPersonId: selectedId, // Set the ID
+        contactPersonName: selectedUser.fullName || selectedUser.name || selectedUser.username, // Set the name
+      }));
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -429,44 +477,38 @@ export const ProjectLeadForm = ({
 
                   <div className="space-y-2">
                     <Label
-                      htmlFor="contactPersonName"
+                      htmlFor="contactPersonId"
                       className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                     >
                       <User className="h-4 w-4 text-blue-600" />
                       Contact Person
                     </Label>
-                    <Input
-                      id="contactPersonName"
-                      value={formData.contactPersonName}
-                      onChange={(e) =>
-                        handleChange("contactPersonName", e.target.value)
-                      }
-                      className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                      placeholder="Primary contact person"
-                    />
+
+                    <Select
+                      value={formData.contactPersonId}
+                      onValueChange={handleContactPersonChange} // 👉 storing _id
+                    >
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
+                        <SelectValue placeholder="Select a contact person" />
+                      </SelectTrigger>
+
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                        {adminUsers.length > 0 ? (
+                          adminUsers.map((user) => (
+                            <SelectItem key={user._id} value={user._id}>
+                              {user.fullName || user.name || user.username || user.email}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-users" disabled>
+                            No users found
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {/* old team section */}
-
-                {/* <div className="space-y-2">
-                  <Label
-                    htmlFor="teamName"
-                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                  >
-                    <User className="h-4 w-4 text-green-600" />
-                    Team
-                  </Label>
-                  <Input
-                    id="teamName"
-                    value={formData.teamName}
-                    onChange={(e) => handleChange("teamName", e.target.value)}
-                    placeholder="Enter Team name (if selected)"
-                    className="h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg"
-                  />
-                </div> */}
-
-                {/* new Team Section  */}
                 <div className="space-y-2">
                   <Label
                     htmlFor="teamName"
@@ -522,7 +564,7 @@ export const ProjectLeadForm = ({
                     </Label>
                     <Input
                       id="followUpDate"
-                      type="date"
+                      type="datetime-local"
                       value={formData.followUpDate}
                       onChange={(e) =>
                         handleChange("followUpDate", e.target.value)
@@ -552,26 +594,6 @@ export const ProjectLeadForm = ({
                   </div>
                 </div>
 
-                {/* <div className="space-y-2">
-                  <Label
-                    htmlFor="skills"
-                    className="text-sm font-semibold text-gray-700 flex items-center gap-2"
-                  >
-                    <Code className="h-4 w-4 text-indigo-600" />
-                    Required Skills (comma separated)
-                  </Label>
-                  <Input
-                    id="skills"
-                    value={formData.skills}
-                    onChange={(e) => handleChange("skills", e.target.value)}
-                    placeholder="e.g., React, TypeScript, Node.js, AWS"
-                    className="h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg"
-                    required
-                  />
-                </div> */}
-
-                {/* newly added skill set on the basis of the enter */}
-
                 <div className="space-y-2">
                   <Label
                     htmlFor="skills"
@@ -585,6 +607,7 @@ export const ProjectLeadForm = ({
                     id="skills"
                     placeholder="e.g., React, TypeScript, AWS"
                     onKeyDown={handleSkillKeyDown}
+                    onBlur={handleSkillBlur}
                     className="h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-lg"
                   />
 
@@ -692,7 +715,7 @@ export const ProjectLeadForm = ({
                       <Input
                         id="projectDescriptionFile"
                         type="file"
-                       // accept=".pdf,.doc,.docx"
+                        // accept=".pdf,.doc,.docx"
                         accept="image/*"
                         onChange={handleFileUpload}
                         className="hidden"
@@ -709,12 +732,12 @@ export const ProjectLeadForm = ({
                         {
                           "Upload Project Description Image"}
                       </Button>
-                                               {/* 🌐 URL display below the button */}
-   {formData.projectDescriptionFile && (
-  <div className="text-xs text-gray-500 truncate break-all">
-    {formData.projectDescriptionFile instanceof File ? formData.projectDescriptionFile.name : formData.projectDescriptionFile}
-  </div>
-)}
+                      {/* 🌐 URL display below the button */}
+                      {formData.projectDescriptionFile && (
+                        <div className="text-xs text-gray-500 truncate break-all">
+                          {formData.projectDescriptionFile instanceof File ? formData.projectDescriptionFile.name : formData.projectDescriptionFile}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

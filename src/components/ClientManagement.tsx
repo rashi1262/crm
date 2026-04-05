@@ -1,12 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Users, TrendingUp } from "lucide-react";
+import { Plus, Search, Users, TrendingUp, ChevronDown, Filter } from "lucide-react";
 import { ClientForm } from "./ClientForm";
 import { ClientList } from "./ClientList";
 import axios from "axios";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Client {
   id: string;
@@ -34,225 +47,298 @@ interface Client {
   paidAmount?: number;
   conversations: number;
   chatMessages: { id: number; message: string; timestamp: string }[];
-  followups: {
-    id: number;
-    description: string;
-    datetime: string;
-    completed: boolean;
-  }[];
+  followups: { id: number; description: string; datetime: string; completed: boolean }[];
+  notes: string;
 }
 
 export const ClientManagement = () => {
   const [clients, setClients] = useState<Client[]>([]);
+  const [contactPersons, setContactPersons] = useState<string[]>([]);
+  const [selectedContactPerson, setSelectedContactPerson] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
   const navigate = useNavigate();
-  const baseURL = import.meta.env.VITE_API_URL
+  const location = useLocation();
+  const params = useParams();
+  const baseURL = import.meta.env.VITE_API_URL;
 
-  const fetchData = async (page = 1) => {
-    try {
-      const skip = (page - 1) * itemsPerPage;
+  const fetchData = useCallback(
+    async (page = 1) => {
+      try {
+        const skip = (page - 1) * itemsPerPage;
+        const filter: any = { limit: itemsPerPage, skip };
 
-      const response = await axios.get(`${baseURL}/clients`, {
-        params: {
-          filter: JSON.stringify({
-            limit: itemsPerPage,
-            skip,
-          }),
-        },
-      });
+        if (searchTerm) filter.search = searchTerm;
+        if (statusFilter !== "all") filter.where = { status: statusFilter };
+        if (selectedContactPerson) filter.where = { contactPerson: selectedContactPerson };
 
-      const backendClients = response.data.data || response.data;
+        const response = await axios.get(`${baseURL}/clients`, { params: { filter: JSON.stringify(filter) } });
+        const backendClients = response.data.data || [];
+        const normalizedClients = backendClients.map((client: any) => ({
+          ...client,
+          id: client._id,
+          contactPerson: client.contactPerson || "N/A",
+          chatMessages: client.chatMessages || [],
+        }));
 
-      const normalizedClients = backendClients.map((client: any) => ({
-        ...client,
-        id: client._id,
-        contactPerson: client.contactPerson || "N/A",
-        chatMessages: client.chatMessages || [],
-      }));
-
-      setClients(normalizedClients);
-      console.log('This is the noremalized client fetched from backend ',normalizedClients)
-
-      if (response.data.pagination) {
-        setCurrentPage(response.data.pagination.currentPage);
-        setTotalPages(response.data.pagination.totalPages);
+        setClients(normalizedClients);
+        if (response.data.pagination) {
+          setCurrentPage(response.data.pagination.currentPage);
+          setTotalPages(response.data.pagination.totalPages);
+        }
+      } catch (error) {
+        console.error("Error fetching clients:", error);
       }
-    } catch (error) {
-      console.error("Error fetching clients:", error);
-    }
-  };
+    },
+    [searchTerm, statusFilter, selectedContactPerson, itemsPerPage, baseURL]
+  );
 
   useEffect(() => {
-    fetchData(1);
+    fetchData(currentPage);
+  }, [currentPage, searchTerm, selectedContactPerson, fetchData, statusFilter]);
+
+  useEffect(() => {
+    fetchContactPersons();
   }, []);
+
+  const fetchContactPersons = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/clients`, {
+        params: { filter: JSON.stringify({ limit: 10000 }) },
+      });
+      const allClients = response.data.data || [];
+      const uniqueContactPersons = Array.from(
+        new Set(allClients.map((c: any) => c.contactPerson).filter(Boolean))
+      ) as string[];
+      setContactPersons(uniqueContactPersons);
+    } catch (error) {
+      console.error("Error fetching contact persons:", error);
+    }
+  };
 
   const addClient = (newClient: Client) => {
     setClients((prevClients) => [newClient, ...prevClients]);
     fetchData(currentPage);
   };
 
-  const filteredClients = clients.filter(
-    (client) =>
-      client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.projectManager?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
 
-  const activeClients = clients.filter(
-    (client) => client.status === "Active"
-  ).length;
-  const pendingPayments = clients.filter(
-    (client) => client.paymentStatus === "Pending"
-  ).length;
+  const handleContactPersonChange = (person: string) => {
+    setSelectedContactPerson(person);
+    setCurrentPage(1);
+  };
 
+  const handleEdit = (client: Client) => {
+    navigate(`/clients/edit/${client.id}`);
+  };
+
+  const handleUpdateProfiles = (updatedProfiles: Client[]) => {
+    setClients(updatedProfiles);
+  };
+
+  const activeClients = clients.filter((c) => c.status === "Active").length;
+  const pendingPayments = clients.filter((c) => c.paymentStatus === "Pending").length;
+
+  // Determine if we're in create or edit mode
+  const editData =
+    location.pathname.startsWith("/clients/edit") && params.id
+      ? clients.find((c) => c.id === params.id) || null
+      : null;
+
+  if (location.pathname === "/clients/create") {
+    return <ClientForm onSave={addClient} onCancel={() => navigate("/clients")} editData={null} />;
+  }
+
+  if (location.pathname.startsWith("/clients/edit") && params.id) {
+    return <ClientForm onSave={addClient} onCancel={() => navigate("/clients")} editData={editData} />;
+  }
+
+  // Main list page
   return (
-    <Routes>
-      <Route
-        path="create"
-        element={
-          <ClientForm
-            onSave={addClient}
-            onCancel={() => navigate("/clients")}
-          />
-        }
-      />
+    <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Client Management
+          </h1>
+          <p className="text-gray-600 mt-2">Manage your clients and track their progress</p>
+        </div>
+        <Button
+          onClick={() => navigate("/clients/create")}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
+          size="lg"
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          Add New Client
+        </Button>
+      </div>
 
-      <Route
-        path="/"
-        element={
-          <div className="space-y-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen p-6">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Client Management
-                </h1>
-                <p className="text-gray-600 mt-2">
-                  Manage your clients and track their progress
-                </p>
+                <p className="text-sm font-medium text-gray-600">Total Clients</p>
+                <p className="text-3xl font-bold text-gray-900">{clients.length}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Active Clients</p>
+                <p className="text-3xl font-bold text-green-600">{activeClients}</p>
+              </div>
+              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending Payments</p>
+                <p className="text-3xl font-bold text-orange-600">{pendingPayments}</p>
+              </div>
+              <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Directory */}
+      <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <CardTitle className="text-xl font-semibold text-gray-800">
+              Client Directory
+            </CardTitle>
+
+            <div className="relative flex items-center gap-3 flex-wrap">
+              {/* 🔍 Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search clients by name or contact person..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  className="pl-10 h-11 w-72 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                />
               </div>
 
-              <Button
-                onClick={() => navigate("create")}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
-                size="lg"
+              {/* ⚙️ Status Filter */}
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
               >
-                <Plus className="h-5 w-5 mr-2" />
-                Add New Client
-              </Button>
-            </div>
+                <SelectTrigger className="w-48 h-11 border-gray-200">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">
-                        Total Clients
-                      </p>
-                      <p className="text-3xl font-bold text-gray-900">
-                        {clients.length}
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Users className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">
-                        Active Clients
-                      </p>
-                      <p className="text-3xl font-bold text-green-600">
-                        {activeClients}
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">
-                        Pending Payments
-                      </p>
-                      <p className="text-3xl font-bold text-orange-600">
-                        {pendingPayments}
-                      </p>
-                    </div>
-                    <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Directory */}
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <CardTitle className="text-xl font-semibold text-gray-800">
-                    Client Directory
-                  </CardTitle>
-                  <div className="relative w-80">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search clients by name or contact person..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-0">
-                <ClientList
-                  clients={filteredClients}
-                  onUpdate={setClients}
-                  refetchClients={() => fetchData(currentPage)}
-                />
-
-                {/* Pagination Controls */}
-                <div className="flex justify-center items-center mt-4 space-x-4">
+              {/* 👤 Contact Person Filter */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
-                    onClick={() => fetchData(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="bg-blue-600 text-white hover:bg-blue-700"
+                    variant="outline"
+                    className="h-11 px-4 border-gray-200 hover:border-gray-300 hover:bg-gray-50 flex items-center gap-2 min-w-[140px] justify-between transition-colors duration-200"
                   >
-                    Prev
+                    <span className="truncate">
+                      {selectedContactPerson || "All Contacts"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0 transition-transform duration-200 data-[state=open]:rotate-180" />
                   </Button>
-                  <span className="text-gray-700">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    onClick={() => fetchData(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="bg-blue-600 text-white hover:bg-blue-700"
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                  className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto p-1 bg-white border border-gray-200 rounded-lg shadow-lg"
+                  align="start"
+                  sideOffset={4}
+                >
+                  <DropdownMenuItem
+                    onClick={() => handleContactPersonChange("")}
+                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${!selectedContactPerson
+                        ? "bg-blue-50 text-blue-700 font-medium"
+                        : "hover:bg-gray-50 text-gray-700"
+                      }`}
                   >
-                    Next
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    <span>All Contacts</span>
+                  </DropdownMenuItem>
+
+                  {contactPersons.length > 0 && (
+                    <div className="h-px bg-gray-200 my-1"></div>
+                  )}
+
+                  {contactPersons.length > 0 ? (
+                    contactPersons.map((person, idx) => (
+                      <DropdownMenuItem
+                        key={idx}
+                        onClick={() => handleContactPersonChange(person)}
+                        className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${selectedContactPerson === person
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "hover:bg-gray-50 text-gray-700"
+                          }`}
+                      >
+                        <span className="truncate">{person}</span>
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem className="px-3 py-2 text-gray-500 text-sm italic">
+                      No contact persons found
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        }
-      />
-    </Routes>
+        </CardHeader>
+
+        <CardContent className="pt-0">
+          <ClientList clients={clients} onUpdate={handleUpdateProfiles} onEdit={handleEdit} refetchClients={() => fetchData(currentPage)} />
+
+          {/* Pagination */}
+          <div className="flex justify-center items-center mt-4 space-x-4">
+            <Button onClick={() => setCurrentPage((prev) => prev - 1)} disabled={currentPage === 1} className="bg-blue-600 text-white hover:bg-blue-700">
+              Prev
+            </Button>
+            <span className="text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button onClick={() => setCurrentPage((prev) => prev + 1)} disabled={currentPage === totalPages} className="bg-blue-600 text-white hover:bg-blue-700">
+              Next
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

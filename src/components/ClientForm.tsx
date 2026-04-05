@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,22 +29,50 @@ import { IndianRupee } from "lucide-react";
 interface ClientFormProps {
   onSave: (data: any) => void;
   onCancel: () => void;
+  editData: any | null; // null when creating new, object when editing
 }
 
-export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
+export const ClientForm = ({ onSave, onCancel, editData }: ClientFormProps) => {
   const [formData, setFormData] = useState({
-    name: "",
-    projectManager: "",
-    contactPerson: "",
-    email: "",
-    mobileNo: "",
-    company: "",
-    status: "Active",
-    nextFollowup: "",
-    paymentStatus: "Paid",
-    notes: "",
-    totalAmount: 0,
+    name: editData?.name || "",
+    projectManager: editData?.projectManager || "",
+    contactPerson: editData?.contactPerson || "", // storing _id if possible
+    email: editData?.email || "",
+    mobileNo: editData?.mobileNo || "",
+    company: editData?.company || "",
+    status: editData?.status || "Active",
+    nextFollowup: editData?.nextFollowup
+      ? new Date(editData.nextFollowup).toISOString().slice(0, 10)
+      : "",
+    paymentStatus: editData?.paymentStatus || "Paid",
+    notes: editData?.notes || "",
+    totalAmount: editData?.totalAmount || 0,
   });
+
+
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const res = await axios.get(`${baseURL}/getAdminUsers`);
+        console.log("users: ", res.data);
+
+        // ✅ Corrected: users are inside res.data, not res.data.data
+        setAdminUsers(res.data || []);
+      } catch (err) {
+        console.error("Error fetching admin users:", err);
+      }
+    };
+    fetchAdmins();
+  }, []);
+
+  useEffect(() => {
+    if (editData?.contactPerson) {
+      setFormData((prev) => ({ ...prev, contactPerson: editData.contactPerson }));
+    }
+  }, [editData]);
+
 
   // const handleCompanyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
   //   if (e.key === "Enter") {
@@ -71,8 +99,6 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
   // getting the env data of the api
 
   const baseURL = import.meta.env.VITE_API_URL;
-
- 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,79 +148,78 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
       return;
     }
     // Validate email
-    if (!formData.email.trim()) {
+    if (!formData.email.trim() && !formData.mobileNo.trim()) {
       toast({
         title: "⚠️ Missing Field",
-        description: "Email is required.",
+        description: "Please provide either an email address or a mobile number.",
         variant: "destructive",
       });
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast({
-        title: "⚠️ Invalid Email",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
-      return;
+    // ✅ Step 2: Validate email (only if filled)
+    if (formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        toast({
+          title: "⚠️ Invalid Email",
+          description: "Please enter a valid email address.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
-    // Validate mobile number
-    if (!formData.mobileNo.trim()) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "Mobile Number is required.",
-        variant: "destructive",
-      });
-      return;
-    } else if (!/^\d{10}$/.test(formData.mobileNo.trim())) {
-      toast({
-        title: "⚠️ Invalid Format",
-        description: "Mobile Number must be exactly 10 digits.",
-        variant: "destructive",
-      });
-      return;
+    if (formData.mobileNo.trim()) {
+      if (!/^[6-9]\d{9}$/.test(formData.mobileNo.trim())) {
+        toast({
+          title: "⚠️ Invalid Mobile Number",
+          description: "Please enter a valid 10-digit mobile number starting with 6–9.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
+
     // Validate company name
-    if (!formData.company.trim()) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "Company Name is required.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!formData.company.trim()) {
+    //   toast({
+    //     title: "⚠️ Missing Field",
+    //     description: "Company Name is required.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
-    if (formData.totalAmount <= 0 || isNaN(formData.totalAmount)) {
-      toast({
-        title: "⚠️ Invalid Budget",
-        description: "Please enter a valid budget amount.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Validate budget
+    // if (formData.totalAmount <= 0 || isNaN(formData.totalAmount)) {
+    //   toast({
+    //     title: "⚠️ Invalid Budget",
+    //     description: "Please enter a valid budget amount.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     // Validate follow-up date
-    if (!formData.nextFollowup) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "Follow-up date is required.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!formData.nextFollowup) {
+    //   toast({
+    //     title: "⚠️ Missing Field",
+    //     description: "Follow-up date is required.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     // Validate notes/description
-    if (!formData.notes.trim()) {
-      toast({
-        title: "⚠️ Missing Field",
-        description: "Notes/descritption  is required.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // if (!formData.notes.trim()) {
+    //   toast({
+    //     title: "⚠️ Missing Field",
+    //     description: "Notes/descritption  is required.",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     // // Validate client budget
     // if (!formData.clientBudget || isNaN(Number(formData.clientBudget))) {
@@ -215,42 +240,51 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
     console.log("📤 Sending payload:", payload);
 
     try {
-      // ✅ Send POST request to backend
-      const response = await axios.post(`${baseURL}/clients`, payload, {
-        headers: { "Content-Type": "application/json" },
-      });
+      let response: any;
 
-      console.log('This is response after submit the data of client creation',response.data.data)
+      if (editData) {
+        response = await axios.patch(`${baseURL}/clients/${editData._id}`, payload, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        toast({
+          title: "Client Updated",
+          description: "Client details have been updated successfully.",
+        });
+      } else {
+        response = await axios.post(`${baseURL}/clients`, payload, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        toast({
+          title: "Client Created",
+          description: "The new Client has been created successfully.",
+        });
+      }
+
       const savedClientFromDb = response.data.data;
 
-      // ✅ Normalize client and attach frontend defaults
       const newClient = {
         ...savedClientFromDb,
-        id: savedClientFromDb._id, // normalize _id
+        id: savedClientFromDb._id,
         conversations: 0,
         chatMessages: [],
         followups: [],
-        totalAmount: 0,
-        paidAmount: 0,
+        totalAmount: savedClientFromDb.totalAmount || 0,
+        paidAmount: savedClientFromDb.paidAmount || 0,
       };
 
-      // ✅ Add to frontend list with real DB id
       onSave(newClient);
-
-      // ✅ Navigate back or close form
       onCancel();
-      toast({
-        title: "✅ Client Created",
-        description: "The new Client  has been created.",
-      });
     } catch (error) {
-      console.log("there is error in submitting the data", error);
+      console.log("Error submitting client data:", error);
+
       toast({
         variant: "destructive",
         title: "❌ Error",
         description:
           error?.response?.data?.message ||
-          "Failed to save the Client . Please try again.",
+          "Failed to save the client. Please try again.",
       });
     }
   };
@@ -273,9 +307,10 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
             Back to Clients
           </Button>
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Add New Client
+            <h1 className="text-4xl font-bold ...">
+              {editData ? "Edit Client" : "Add New Client"}
             </h1>
+
             <p className="text-gray-600 mt-1">
               Create a new client profile with complete information
             </p>
@@ -318,6 +353,7 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
                     />
                   </div>
 
+                  {/* Contact Person Field */}
                   <div className="space-y-2">
                     <Label
                       htmlFor="contactPerson"
@@ -326,15 +362,40 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
                       <User className="h-4 w-4 text-blue-600" />
                       Contact Person
                     </Label>
-                    <Input
-                      id="contactPerson"
+                    <Select
                       value={formData.contactPerson}
-                      onChange={(e) =>
-                        handleChange("contactPerson", e.target.value)
+                      onValueChange={(val) =>
+                        handleChange("contactPerson", val)
                       }
-                      className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                      placeholder="Primary contact person"
-                    />
+                    >
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
+                        <SelectValue placeholder="Select a contact person" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+                        {adminUsers.length > 0 ? (
+                          adminUsers.map((user) => (
+                            <SelectItem
+                              key={user._id}
+                              value={
+                                user.fullName ||
+                                user.name ||
+                                user.username ||
+                                user.email
+                              }
+                            >
+                              {user.fullName ||
+                                user.name ||
+                                user.username ||
+                                user.email}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-users" disabled>
+                            No users found
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -541,7 +602,7 @@ export const ClientForm = ({ onSave, onCancel }: ClientFormProps) => {
                   type="submit"
                   className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  💾 Save Client
+                  💾 {editData ? "Update Client Profile" : "Create Client Profile"}
                 </Button>
                 <Button
                   type="button"

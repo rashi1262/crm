@@ -16,7 +16,7 @@ export interface BlogPost {
   date: string; // ISO date string or similar, for consistent sorting
   author?: string; // Optional, as SolarStation might not provide it directly
   category?: string; // Optional, as SolarStation might not provide it directly
-  tags: string[]; // Normalized as an array of strings
+  tags: string | string[]; // Normalized as an array of strings
   isFeatured: 'Yes' | 'No'; // Normalized frontend display string (e.g., for badges)
   website: string; // Crucial: Identifies the source ('solarstation.in' or 'vidhema.com')
   keywords: string;

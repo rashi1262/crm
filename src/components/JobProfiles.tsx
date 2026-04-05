@@ -1,9 +1,8 @@
-// Imports (same as your original)
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Briefcase, Clock, Users } from "lucide-react";
+import { Plus, Search, Filter, Briefcase, Clock, Users, ChevronDown } from "lucide-react";
 import { JobProfileForm } from "./JobProfileForm";
 import { JobProfileList } from "./JobProfileList";
 import {
@@ -15,8 +14,8 @@ import {
 } from "@/components/ui/select";
 import axios from "axios";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
 
-// Types (unchanged)
 interface PopulatedClientDetails {
   _id: string;
   name: string;
@@ -58,51 +57,91 @@ export const JobProfiles = () => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
+  const baseURL = import.meta.env.VITE_API_URL;
+
+  const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [jobProfiles, setJobProfiles] = useState<JobProfile[]>([]);
+  const [contactPersons, setContactPersons] = useState<string[]>([]);
+  const [selectedContactPerson, setSelectedContactPerson] = useState("");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const limit = 10;
-  const baseURL = import.meta.env.VITE_API_URL;
+  const itemsPerPage = 10;
 
-   useEffect(() => {
-    const fetchJobProfiles = async () => {
+  /** Fetch Job Profiles */
+  const fetchJobProfiles = useCallback(
+    async (page = 1) => {
       try {
-        await axios
-          .get(`${baseURL}/getAllJobProfiles?page=${currentPage}&limit=${limit}`)
-          .then((response) => {
-            console.log('This is fetch job with paginataion',response)
-            setJobProfiles(response.data.data);
-            // Assuming the API response includes total job count or total pages
-      const totalCount = response.data.totalCount; // Adjust based on your API response
-      setTotalPages(Math.ceil(totalCount / limit));
-          })
-          .catch((error) => {
-            console.log("Error to fetch jobProfilesData", error);
-          });
-      } catch (error) {
-        console.log(error);
-      }
-    };
-    fetchJobProfiles();
-  }, [currentPage]);
+        const skip = (page - 1) * itemsPerPage;
+        const filter: any = { limit: itemsPerPage, skip, include: 'clientId' };
 
- 
-  console.log('this is the jobprofile state value',jobProfiles)
-  const addJobProfile = async () => {
+        if (searchTerm) filter.search = searchTerm;
+        if (statusFilter !== "all") filter.where = { status: statusFilter };
+        if (selectedContactPerson) filter.where = { contactPersonName: selectedContactPerson };
+
+        const response = await axios.get(`${baseURL}/getAllJobProfiles`, {
+          params: { filter: JSON.stringify(filter) },
+        });
+
+        const backendProfiles = response.data.data || [];
+        const normalizedProfiles = backendProfiles.map((p: any) => ({
+          ...p,
+          id: p._id,
+          clientId: p.clientId || { name: "N/A" },
+        }));
+
+        setJobProfiles(normalizedProfiles);
+        if (response.data.pagination) {
+          setCurrentPage(response.data.pagination.currentPage);
+          setTotalPages(response.data.pagination.totalPages);
+        }
+      } catch (error) {
+        console.error("Error fetching job profiles:", error);
+      }
+    },
+    [searchTerm, statusFilter, selectedContactPerson, itemsPerPage, baseURL]
+  );
+
+  const fetchContactPersons = async () => {
     try {
-      const response = await axios.get(
-        `${baseURL}/getAllJobProfiles?page=${currentPage}&limit=${limit}`
-      );
-      setJobProfiles(response.data.data || []);
-      console.log('This is the all job data after adding  ',response.data)
-      navigate("/jobs");
+      const response = await axios.get(`${baseURL}/getAllJobProfiles`, {
+        params: { filter: JSON.stringify({ limit: 10000 }) },
+      });
+      const allClients = response.data.data || [];
+      const uniqueContactPersons = Array.from(
+        new Set(allClients.map((c: any) => c.contactPersonName).filter(Boolean))
+      ) as string[];
+      setContactPersons(uniqueContactPersons);
     } catch (error) {
-      console.log("Error fetching updated job profiles", error);
+      console.error("Error fetching contact persons:", error);
     }
+  };
+
+  useEffect(() => {
+    fetchContactPersons();
+  }, []);
+
+  /** Fetch data on filters or page change */
+  useEffect(() => {
+    fetchJobProfiles(currentPage);
+  }, [currentPage, searchTerm, selectedContactPerson, statusFilter, fetchJobProfiles]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleContactPersonChange = (person: string) => {
+    setSelectedContactPerson(person);
+    setCurrentPage(1);
+  };
+
+  /** Add new job (re-fetch after create) */
+  const addJobProfile = (newProfile: JobProfile) => {
+    setJobProfiles((prev) => [newProfile, ...prev]);
+    fetchJobProfiles(currentPage);
   };
 
   const handleEdit = (profile: JobProfile) => {
@@ -113,64 +152,19 @@ export const JobProfiles = () => {
     setJobProfiles(updatedProfiles);
   };
 
-  // const sortedProfiles = [...jobProfiles].sort(
-  //   (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  // );
+  /** Derived Stats */
+  const activeProfiles = jobProfiles.filter((p) => p.status === "Active").length;
+  const scheduledInterviews = jobProfiles.filter(
+    (p) => p.status === "Interview Scheduled"
+  ).length;
 
-  let sortedProfiles: JobProfile[] = [];
-
-if (Array.isArray(jobProfiles)) {
-  sortedProfiles = [...jobProfiles].sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-}
-
-
-  // const filteredProfiles = sortedProfiles.filter((profile) => {
-  //   const matchesSearch =
-  //     profile.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //     profile?.clientId?.name.toLowerCase().includes(searchTerm.toLowerCase());
-  //   const matchesStatus =
-  //     statusFilter === "all" || profile.status === statusFilter;
-  //   return matchesSearch && matchesStatus;
-  // });
-
-  // const activeProfiles = jobProfiles.filter(
-  //   (profile) => profile.status === "Active"
-  // ).length;
-
-  // const scheduledInterviews = jobProfiles.filter(
-  //   (profile) => profile.status === "Interview Scheduled"
-  // ).length;
-
-  
-  // new 
-  const filteredProfiles = Array.isArray(sortedProfiles)
-  ? sortedProfiles.filter((profile) => {
-      const matchesSearch =
-        profile.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        profile?.clientId?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" || profile.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    })
-  : [];
-
-const activeProfiles = Array.isArray(jobProfiles)
-  ? jobProfiles.filter((profile) => profile.status === "Active").length
-  : 0;
-
-const scheduledInterviews = Array.isArray(jobProfiles)
-  ? jobProfiles.filter((profile) => profile.status === "Interview Scheduled").length
-  : 0;
-
-  
+  /** Edit mode detection */
   const editData =
     location.pathname.startsWith("/jobs/edit") && params.id
       ? jobProfiles.find((p) => p._id === params.id) || null
       : null;
 
+  // Create or Edit form rendering
   if (location.pathname === "/jobs/create") {
     return (
       <JobProfileForm
@@ -180,6 +174,7 @@ const scheduledInterviews = Array.isArray(jobProfiles)
       />
     );
   }
+
   if (location.pathname.startsWith("/jobs/edit") && params.id) {
     return (
       <JobProfileForm
@@ -190,8 +185,10 @@ const scheduledInterviews = Array.isArray(jobProfiles)
     );
   }
 
+  // Main Job Profile Directory
   return (
     <div className="space-y-8 bg-gradient-to-br from-gray-50 to-purple-50 min-h-screen p-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
@@ -211,83 +208,84 @@ const scheduledInterviews = Array.isArray(jobProfiles)
         </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Total Profiles */}
         <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Total Job Profiles
-                </p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {jobProfiles.length}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <Briefcase className="h-6 w-6 text-purple-600" />
-              </div>
+          <CardContent className="p-6 flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                Total Job Profiles
+              </p>
+              <p className="text-3xl font-bold text-gray-900">
+                {jobProfiles.length}
+              </p>
+            </div>
+            <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
+              <Briefcase className="h-6 w-6 text-purple-600" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Active Profiles */}
         <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Active Job Profiles
-                </p>
-                <p className="text-3xl font-bold text-green-600">
-                  {activeProfiles}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Users className="h-6 w-6 text-green-600" />
-              </div>
+          <CardContent className="p-6 flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                Active Job Profiles
+              </p>
+              <p className="text-3xl font-bold text-green-600">
+                {activeProfiles}
+              </p>
+            </div>
+            <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+              <Users className="h-6 w-6 text-green-600" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Scheduled Interviews */}
         <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Scheduled Interviews
-                </p>
-                <p className="text-3xl font-bold text-blue-600">
-                  {scheduledInterviews}
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Clock className="h-6 w-6 text-blue-600" />
-              </div>
+          <CardContent className="p-6 flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-gray-600">
+                Scheduled Interviews
+              </p>
+              <p className="text-3xl font-bold text-blue-600">
+                {scheduledInterviews}
+              </p>
+            </div>
+            <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <Clock className="h-6 w-6 text-blue-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Directory */}
       <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <CardTitle className="text-xl font-semibold text-gray-800">
               Job Profile Directory
             </CardTitle>
-            <div className="flex gap-4">
-              <div className="relative w-80">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <div className="flex gap-3 flex-wrap">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search job profiles by title or client..."
+                  placeholder="Search by title or client name..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-11 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                  onChange={handleSearchChange}
+                  className="pl-10 h-11 w-72 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+
+              {/* Status Filter */}
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
+              >
                 <SelectTrigger className="w-48 h-11 border-gray-200">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Filter by status" />
@@ -303,43 +301,73 @@ const scheduledInterviews = Array.isArray(jobProfiles)
                   <SelectItem value="On Hold">On Hold</SelectItem>
                 </SelectContent>
               </Select>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-11 px-4 border-gray-200 hover:border-gray-300 hover:bg-gray-50 flex items-center gap-2 min-w-[140px] justify-between transition-colors duration-200"
+                  >
+                    <span className="truncate">{selectedContactPerson || "All Contacts"}</span>
+                    <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0 transition-transform duration-200 data-[state=open]:rotate-180" />
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto p-1 bg-white border border-gray-200 rounded-lg shadow-lg" align="start" sideOffset={4}>
+                  <DropdownMenuItem
+                    onClick={() => handleContactPersonChange("")}
+                    className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${!selectedContactPerson ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"
+                      }`}
+                  >
+                    <span>All Contacts</span>
+                  </DropdownMenuItem>
+
+                  {contactPersons.length > 0 && <div className="h-px bg-gray-200 my-1"></div>}
+
+                  {contactPersons.length > 0 ? (
+                    contactPersons.map((person, idx) => (
+                      <DropdownMenuItem
+                        key={idx}
+                        onClick={() => handleContactPersonChange(person)}
+                        className={`px-3 py-2 rounded-md cursor-pointer transition-colors duration-150 flex items-center gap-2 ${selectedContactPerson === person ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"
+                          }`}
+                      >
+                        <span className="truncate">{person}</span>
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem className="px-3 py-2 text-gray-500 text-sm italic">No contact persons found</DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="pt-0">
           <JobProfileList
-            profiles={filteredProfiles}
+            profiles={jobProfiles}
             onUpdate={handleUpdateProfiles}
             onEdit={handleEdit}
+            refetchProfiles={() => fetchJobProfiles(currentPage)}
           />
 
-          {/* Pagination Controls */}
-          <div className="flex justify-center items-center gap-4 pt-6">
+          {/* Pagination */}
+          <div className="flex justify-center items-center mt-6 gap-4">
             <Button
-              className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded ${
-                currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              onClick={() => setCurrentPage((prev) => prev - 1)}
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              className="bg-purple-600 text-white hover:bg-purple-700"
             >
               Prev
             </Button>
-
-            <span className="text-sm text-blue-600 font-medium">
+            <span className="text-gray-700">
               Page {currentPage} of {totalPages}
             </span>
-
             <Button
-              className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded ${
-                currentPage === totalPages
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
-              }`}
+              onClick={() => setCurrentPage((prev) => prev + 1)}
               disabled={currentPage === totalPages}
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-              }
+              className="bg-purple-600 text-white hover:bg-purple-700"
             >
               Next
             </Button>

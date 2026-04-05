@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { BlogPost } from '../types/index';
 
 // Import ShadCN UI Components
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
 
 // Import Lucide React Icons
 import {
@@ -35,10 +36,10 @@ interface EditBlogFormData extends Omit<BlogPost, 'tags'> {
 
 export default function EditBlog(): JSX.Element {
   const navigate = useNavigate();
-  const { slug } = useParams<{ slug: string }>();
+  const { id } = useParams<{ id: string }>();
 
-  const [formData, setFormData] = useState<EditBlogFormData>({
-    id: 0,
+  const [formData, setFormData] = useState<Omit<EditBlogFormData, 'images'> & { images: string[] }>({
+    id: '',
     title: '',
     date: '',
     slug: '',
@@ -49,32 +50,52 @@ export default function EditBlog(): JSX.Element {
     isFeatured: 'No',
     description: '',
     tags: '',
-    imageUrl: '',
-    website: ''
+    images: [],
+    website: '',
+    featuredImage: '' // Add this line to fix the error
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  console.log("formData test: ", formData);
   useEffect(() => {
-    if (slug && typeof window !== 'undefined') {
-      const storedBlogs = localStorage.getItem('blogPosts');
-      if (storedBlogs) {
-        const blogs: BlogPost[] = JSON.parse(storedBlogs);
-        const blogToEdit = blogs.find((blog: BlogPost) => blog.slug === slug);
-        if (blogToEdit) {
-          setFormData({
-            ...blogToEdit,
-            tags: Array.isArray(blogToEdit.tags) ? blogToEdit.tags.join(', ') : blogToEdit.tags,
-          });
-          setImagePreview(blogToEdit.imageUrl);
-        } else {
-          navigate('/blog'); // Adjusted route path for consistency
-          window.alert('Blog not found!');
-        }
+    // ✅ Fetch from API only using id
+    const fetchBlog = async () => {
+      try {
+        const res = await fetch(
+          `https://api.solarstation.in/blogs/getBlogById/${id}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch blog");
+
+        const data = await res.json();
+        const blogData = data.data;
+
+        console.log("test blogData", blogData);
+        const formattedDate = blogData.date
+          ? new Date(blogData.date).toISOString().split("T")[0]
+          : "";
+
+        setFormData({
+          ...blogData,
+          id: blogData._id,
+          date: formattedDate, 
+          // tags: Array.isArray(blogData.tags)
+          //   ? blogData.tags.join(", ")
+          //   : blogData.tags || "",
+          tags: blogData.tags || "",
+          isFeatured: blogData.isFeatured === "Yes" ? "Yes" : "No",
+        });
+        setImagePreview(blogData.imageUrl);
+      } catch (error) {
+        console.error("Error fetching blog:", error);
+        navigate("/blog");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }
-  }, [slug, navigate]);
+    };
+    fetchBlog();
+  }, [id, navigate]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>): void => {
     const { name, value, type } = e.target;
@@ -100,29 +121,69 @@ export default function EditBlog(): JSX.Element {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
 
-    if (typeof window === 'undefined') return;
+    if (!formData.id) {
+      toast({
+        title: "Missing Blog ID",
+        description: "Cannot update blog because the ID is missing.",
+        variant: "destructive",
+        duration: 2000,
+      });
+      return;
+    }
 
-    const storedBlogs = localStorage.getItem('blogPosts');
-    let existingBlogs: BlogPost[] = storedBlogs ? JSON.parse(storedBlogs) : [];
+    try {
+      const updatedBlog = {
+        ...formData,
+        // tags: Array.isArray(formData.tags)
+        //   ? formData.tags.join(", ") // convert array to string
+        //   : formData.tags || "",
+        tags: formData.tags,
+        isFeatured: formData.isFeatured === "Yes" ? true : false,
+        imageUrl: imagePreview || formData.images,
+      };
 
-    const updatedBlogs = existingBlogs.map((blog: BlogPost) => {
-      if (blog.id === formData.id) {
-        return {
-          ...formData,
-          tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag !== ''),
-          imageUrl: imagePreview || formData.imageUrl // Use imagePreview if it exists, otherwise existing imageUrl
-        };
+
+      const response = await fetch(
+        `https://api.solarstation.in/blogs/updateBlogById/${formData.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedBlog),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData?.error || "Failed to update blog");
       }
-      return blog;
-    });
 
-    localStorage.setItem('blogPosts', JSON.stringify(updatedBlogs));
-    window.alert('Blog updated successfully!');
-    navigate('/blog'); // Adjusted route path for consistency
+      const result = await response.json();
+      console.log("✅ Blog updated:", result);
+
+      toast({
+        title: "Blog Updated",
+        description: `Blog "${formData.title}" was updated successfully!`,
+        variant: "default",
+        duration: 1500,
+      });
+      navigate("/blog");
+    } catch (error) {
+      console.error("❌ Error updating blog:", error);
+      toast({
+        title: "Update Failed",
+        description: error?.message || "Failed to update blog. Please try again later.",
+        variant: "destructive",
+        duration: 2000,
+      });
+    }
   };
+
+
 
   if (loading) {
     return (
@@ -263,58 +324,58 @@ export default function EditBlog(): JSX.Element {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="tags" className="text-sm font-semibold text-gray-700">
-                            Tags (Comma Separated)
-                        </Label>
-                        <Input
-                            id="tags"
-                            name="tags"
-                            value={formData.tags}
-                            onChange={handleChange}
-                            placeholder="e.g., react, javascript, frontend"
-                            className="h-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-lg"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="website" className="text-sm font-semibold text-gray-700">
-                            Associated Website
-                        </Label>
-                        <Select
-                            value={formData.website}
-                            onValueChange={(value) => handleSelectChange("website", value)}
-                        >
-                            <SelectTrigger className="h-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-lg">
-                                <SelectValue placeholder="Select a Website" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                                <SelectItem value="solarstation.in">solarstation.in</SelectItem>
-                                <SelectItem value="https://vidhema.com/">vidhema.com</SelectItem>
-                                <SelectItem value="https://vidhematechnology.com/">vidhematechnology.com</SelectItem>
-                                <SelectItem value="https://erp.vidhema.com/">erp.vidhema.com</SelectItem>
-                                {/* Add more options as needed */}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-
-                 <div className="space-y-2">
-                    <Label htmlFor="isFeatured" className="text-sm font-semibold text-gray-700">
-                      Is Featured?
+                  <div className="space-y-2">
+                    <Label htmlFor="tags" className="text-sm font-semibold text-gray-700">
+                      Tags (Comma Separated)
+                    </Label>
+                    <Input
+                      id="tags"
+                      name="tags"
+                      value={formData.tags}
+                      onChange={handleChange}
+                      placeholder="e.g., react, javascript, frontend"
+                      className="h-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="website" className="text-sm font-semibold text-gray-700">
+                      Associated Website
                     </Label>
                     <Select
-                        value={formData.isFeatured}
-                        onValueChange={(value) => handleSelectChange("isFeatured", value)}
+                      value={formData.website}
+                      onValueChange={(value) => handleSelectChange("website", value)}
                     >
-                        <SelectTrigger className="h-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-lg">
-                            <SelectValue placeholder="Select Yes/No" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-gray-200 shadow-lg">
-                            <SelectItem value="No">No</SelectItem>
-                            <SelectItem value="Yes">Yes</SelectItem>
-                        </SelectContent>
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-lg">
+                        <SelectValue placeholder="Select a Website" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                        <SelectItem value="solarstation.in">solarstation.in</SelectItem>
+                        <SelectItem value="https://vidhema.com/">vidhema.com</SelectItem>
+                        <SelectItem value="https://vidhematechnology.com/">vidhematechnology.com</SelectItem>
+                        <SelectItem value="https://erp.vidhema.com/">erp.vidhema.com</SelectItem>
+                        {/* Add more options as needed */}
+                      </SelectContent>
                     </Select>
-                 </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="isFeatured" className="text-sm font-semibold text-gray-700">
+                    Is Featured?
+                  </Label>
+                  <Select
+                    value={formData.isFeatured}
+                    onValueChange={(value) => handleSelectChange("isFeatured", value)}
+                  >
+                    <SelectTrigger className="h-12 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-lg">
+                      <SelectValue placeholder="Select Yes/No" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-gray-200 shadow-lg">
+                      <SelectItem value="No">No</SelectItem>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
               </div>
 

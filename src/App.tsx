@@ -14,10 +14,10 @@ import { ClientManagement } from "./components/ClientManagement";
 import { JobProfileForm } from "./components/JobProfileForm";
 import { JobProfiles } from "./components/JobProfiles";
 import { Analytics } from "./components/Analytics";
-import { Dashboard } from "./components/Dashboard";
+import { Dashboard } from "./components/dashboard/Dashboard";
 import { ProjectLeads } from "./components/ProjectLeads";
 import { ProjectLeadForm } from "./components/ProjectLeadForm";
-import {AllFollowUps} from "./components/AllFollowUps";
+import { AllFollowUps } from "./components/AllFollowUps";
 
 import BlogList from './components/BlogList';
 import Applications from "./components/Applications";
@@ -36,6 +36,10 @@ import EditBlog from './components/EditBlog';
 import ProtectedRoute from "./Routes/ProtectedRoute";
 import PublicRoute from "./Routes/PublicRoute";
 import Profile from "./components/Profile";
+import EditVidhemaBlogForm from "./components/EditVidhemaBlogForm";
+import { Support } from "./components/Support";
+import AddFollowUps from "./components/AddFollowUps";
+import { ClientForm } from "./components/ClientForm";
 
 const queryClient = new QueryClient();
 
@@ -65,11 +69,14 @@ const App = () => {
                 {/* Default protected route, redirects to dashboard */}
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 {/* new All followup filter */}
-               <Route path="allfollowup" element={<AllFollowUps />} />
+                <Route path="allfollowup" element={<AllFollowUps />} />
+                <Route path="addfollowup" element={<AddFollowUps />} />
 
                 {/* Existing Protected Routes */}
                 <Route path="dashboard" element={<Dashboard />} />
-                <Route path="clients/*" element={<ClientManagement />} />
+                <Route path="clients" element={<ClientManagement />}>
+                  <Route path="create" element={<ClientForm onSave={() => { }} onCancel={() => { }} editData={null} />} />
+                  <Route path="edit/:id" element={<ClientForm onSave={() => { }} onCancel={() => { }} editData={null} />} />                </Route>
                 <Route path="projects" element={<ProjectLeads />}>
                   <Route path="create" element={<ProjectLeadForm onSave={() => { }} onCancel={() => { }} editData={null} />} />
                   <Route path="edit/:id" element={<ProjectLeadForm onSave={() => { }} onCancel={() => { }} editData={null} />} />
@@ -86,15 +93,17 @@ const App = () => {
                 <Route path="blog" element={<BlogList />} />
                 {/* Update this route to use the new AddBlogPage component */}
                 <Route path="blog/add" element={<AddBlogPage />} /> {/* <--- CHANGED THIS LINE */}
-                <Route path="blog/edit/:slug" element={<EditBlog />} />
+                <Route path="blog/edit/:id" element={<EditBlog />} />
+
+                <Route path="support" element={<Support />} />
 
                 {/* new profile page route */}
-                 <Route path="profile" element={<Profile />} />
+                <Route path="profile" element={<Profile />} />
               </Route>
 
-              
+              <Route path="/blog/vidhema/edit/:slug" element={<EditVidhemaBlogForm />} />
 
-              
+
             </Route>
 
             {/* Catch-all route for 404 (must be last) */}
