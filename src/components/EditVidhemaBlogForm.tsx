@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +27,10 @@ const baseURL = import.meta.env.VITE_API_URL;
 export default function EditVidhemaBlogForm(): JSX.Element {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnUrl = location.state?.returnUrl || "/blog";
+  const returnUrlRef = useRef(returnUrl);
+  const scrollToId = location.state?.scrollToId;
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -138,7 +142,7 @@ export default function EditVidhemaBlogForm(): JSX.Element {
           description: err.message || "Failed to load blog data",
           variant: "destructive",
         });
-        navigate("/blog");
+        navigate(returnUrlRef.current, { state: { scrollToId } });
       } finally {
         setFetching(false);
       }
@@ -316,7 +320,7 @@ export default function EditVidhemaBlogForm(): JSX.Element {
         title: "Success",
         description: "Blog updated successfully"
       });
-      navigate("/blog");
+      navigate(returnUrlRef.current, { state: { scrollToId } });
     } catch (err: any) {
       toast({
         title: "Error",
@@ -345,7 +349,7 @@ export default function EditVidhemaBlogForm(): JSX.Element {
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
-            onClick={() => navigate("/blog")}
+            onClick={() => navigate(returnUrlRef.current, { state: { scrollToId } })}
             className="flex items-center gap-1"
           >
             <ArrowLeft className="h-4 w-4" /> Back to Blogs
@@ -665,7 +669,7 @@ export default function EditVidhemaBlogForm(): JSX.Element {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/blog")}
+            onClick={() => navigate(returnUrlRef.current, { state: { scrollToId } })}
           >
             Cancel
           </Button>

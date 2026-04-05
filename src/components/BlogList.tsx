@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 // IMPORTS: Corrected paths for specific raw types and common BlogPost
 import { BlogPost } from "../types"; // Common BlogPost from index.ts
@@ -130,12 +130,20 @@ export default function BlogList(): JSX.Element {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const websiteFilter = searchParams.get("website") || "solarstation.in";
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
   const [totalPages, setTotalPages] = useState<number>(1);
 
   const currentLimit: number = 10; // Fixed to 10 blogs per page
 
-  const [websiteFilter, setWebsiteFilter] = useState<string>("solarstation.in");
+  const setCurrentPage = (page: number) => {
+    const params = new URLSearchParams(location.search);
+    params.set("page", page.toString());
+    navigate(`/blog?${params.toString()}`, { replace: true });
+  };
 
   const availableWebsites = [
     { value: "all", label: "All Blogs" }, // ADDED: 'All Blogs' option
@@ -486,10 +494,30 @@ export default function BlogList(): JSX.Element {
   };
   // currentLimit is now a constant, no need to include in dependency array.
   useEffect(() => {
-    console.log("[useEffect] current page change to:", currentPage);
-
     fetchBlogs();
-  }, [currentPage, searchTerm, websiteFilter, vidhemaAccessToken, toast]);
+  }, [location.search, searchTerm]); // ✅ location.search covers both websiteFilter and currentPage
+
+  useEffect(() => {
+    const scrollToId = location.state?.scrollToId;
+    if (!scrollToId || loading || blogs.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const element = document.getElementById(`blog-${scrollToId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.classList.add("ring-2", "ring-blue-400");
+        setTimeout(() => element.classList.remove("ring-2", "ring-blue-400"), 2000);
+
+        // ✅ Clear the state so it doesn't scroll again on re-renders
+        navigate(location.pathname + location.search, {
+          replace: true,
+          state: {},
+        });
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [loading, blogs, location.state?.scrollToId]);
 
   // --- Pagination Handlers ---
   const handlePageChange = (page: number) => {
@@ -518,8 +546,10 @@ export default function BlogList(): JSX.Element {
   };
 
   const handleWebsiteFilterChange = (value: string) => {
-    setWebsiteFilter(value);
-    setCurrentPage(1); // Reset to first page when filter changes
+    const params = new URLSearchParams(location.search);
+    params.set("website", value);
+    params.delete("page"); // reset page on filter change
+    navigate(`/blog?${params.toString()}`, { replace: true });
   };
 
   // Helper to generate pagination items (logic remains the same)
@@ -777,6 +807,7 @@ export default function BlogList(): JSX.Element {
           {blogs.map((blog: BlogPost) => (
             <div
               key={blog.id}
+              id={`blog-${blog.id}`}
               className="border-0 rounded-xl p-6 bg-white shadow-lg hover:shadow-xl transition-all duration-200 border-l-4 border-l-blue-500"
             >
               <div className="flex items-start justify-between flex-wrap md:flex-nowrap gap-4">
@@ -835,11 +866,11 @@ export default function BlogList(): JSX.Element {
                         variant="outline"
                         className="border-green-200 text-green-700 hover:bg-green-50"
                         onClick={() => {
+                          const returnUrl = `/blog?website=${websiteFilter}&page=${currentPage}`;
                           if (blog.website === "solarstation.in") {
-                            // navigate(`/blog/edit/${blog.id}`, {state: { blog }});
-                            navigate(`/blog/edit/${blog.id}`);
+                            navigate(`/blog/edit/${blog.id}`, { state: { returnUrl, scrollToId: blog.id } });
                           } else if (blog.website === "vidhema.com") {
-                            navigate(`/blog/vidhema/edit/${blog.slug}`);
+                            navigate(`/blog/vidhema/edit/${blog.slug}`, { state: { returnUrl, scrollToId: blog.id } });
                           }
                         }}
                       >
