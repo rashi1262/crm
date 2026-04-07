@@ -44,6 +44,7 @@ interface JobProfile {
   skills: string[];
   description: string;
   clientBudget: number;
+  openPositions: number;
   status: string;
   jd?: string;
   actionDetails?: ActionDetails;

@@ -43,6 +43,7 @@ interface JobProfile {
   description?: string;
   status?: string;
   jd?: string;
+  openPositions?: number;
 }
 
 interface JobProfileFormProps {
@@ -92,10 +93,33 @@ export const JobProfileForm = ({
     status: editData ? editData.status : "Active",
     jdFile: editData?.jd || "",
     candidateName: editData?.actionDetails?.candidateName || "",
-    openPositions: editData?.openPositions || 1,
+    openPositions: editData?.openPositions || "",
     location: editData?.location || "",
     experience: editData?.experience || "",
   });
+
+  const [lastEditId, setLastEditId] = useState<string | null>(null);
+  useEffect(() => {
+    if (editData && editData._id !== lastEditId) {
+      setFormData({
+        title: editData.title || "",
+        clientId: editData.clientId?._id || "",
+        contactPersonName: editData.contactPersonName || "",
+        contactPersonId: editData.actionDetails?.employeeId || "",
+        followUpDate: formatDate(editData.actionDetails?.followUpDate || ""),
+        clientBudget: editData.clientBudget || "",
+        skills: editData.skills ?? [],
+        description: editData.description || "",
+        status: editData.status || "Active",
+        jdFile: editData.jd || "",
+        candidateName: editData.actionDetails?.candidateName || "",
+        openPositions: editData.openPositions || "",
+        location: editData.location || "",
+        experience: editData.experience || "",
+      });
+      setLastEditId(editData._id || null);
+    }
+  }, [editData?._id, lastEditId]);
 
   // here above work agian next day
   const [adminUsers, setAdminUsers] = useState([]);
@@ -416,7 +440,7 @@ export const JobProfileForm = ({
                     className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                   >
                     <Briefcase className="h-4 w-4 text-purple-600" />
-                    Job Title
+                    Job Title <span className="text-red-500 ml-1">*</span>
                   </Label>
                   <Input
                     id="title"
@@ -434,7 +458,7 @@ export const JobProfileForm = ({
                       className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                     >
                       <Users className="h-4 w-4 text-blue-600" />
-                      Client Name
+                      Client Name <span className="text-red-500 ml-1">*</span>
                     </Label>
                     <Select
                       value={formData.clientId}
@@ -469,7 +493,7 @@ export const JobProfileForm = ({
                       className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                     >
                       <User className="h-4 w-4 text-blue-600" />
-                      Contact Person
+                      Contact Person <span className="text-red-500 ml-1">*</span>
                     </Label>
 
                     <Select
@@ -540,7 +564,7 @@ export const JobProfileForm = ({
                       className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                     >
                       <Calendar className="h-4 w-4 text-orange-600" />
-                      Follow-up Date
+                      Follow-up Date <span className="text-red-500 ml-1">*</span>
                     </Label>
                     <Input
                       id="followUpDate"
@@ -559,7 +583,7 @@ export const JobProfileForm = ({
                       className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                     >
                       <IndianRupee className="h-4 w-4 text-green-600" />
-                      Budget
+                      Budget <span className="text-red-500 ml-1">*</span>
                     </Label>
                     <Input
                       id="clientBudget"
@@ -638,7 +662,7 @@ export const JobProfileForm = ({
                     className="text-sm font-semibold text-gray-700 flex items-center gap-2"
                   >
                     <FileText className="h-4 w-4 text-gray-600" />
-                    Job Description
+                    Job Description <span className="text-red-500 ml-1">*</span>
                   </Label>
                   <Textarea
                     id="description"
@@ -662,8 +686,9 @@ export const JobProfileForm = ({
                     min={1}
                     value={formData.openPositions}
                     onChange={(e) => handleChange("openPositions", e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="e.g. 2"
-                    className="h-12 border-gray-300 focus:border-purple-500 rounded-lg"
+                    className="h-12 border-gray-300 focus:border-purple-500 rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
 
@@ -671,7 +696,7 @@ export const JobProfileForm = ({
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Briefcase className="h-4 w-4 text-blue-600" />
-                    Branch Location
+                    Branch Location <span className="text-red-500 ml-1">*</span>
                   </Label>
                   <Select
                     value={formData.location}
@@ -694,7 +719,7 @@ export const JobProfileForm = ({
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-orange-600" />
-                    Experience Required
+                    Experience Required <span className="text-red-500 ml-1">*</span>
                   </Label>
                   <Select
                     value={formData.experience}
