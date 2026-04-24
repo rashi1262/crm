@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
 // IMPORTS: Corrected paths for specific raw types and common BlogPost
@@ -136,6 +136,7 @@ export default function BlogList(): JSX.Element {
   const websiteFilter = searchParams.get("website") || "solarstation.in";
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const currentLimit: number = 10; // Fixed to 10 blogs per page
 
@@ -247,6 +248,13 @@ export default function BlogList(): JSX.Element {
       searchTerm
     );
 
+    // Cancel any previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setLoading(true);
     setError(null);
     try {
@@ -277,6 +285,7 @@ export default function BlogList(): JSX.Element {
             access_token: vidhemaAccessToken,
             "Content-Type": "application/json",
           },
+          signal: abortController.signal,
         });
         if (!response.ok) {
           const errorData = await response.json();
@@ -322,7 +331,9 @@ export default function BlogList(): JSX.Element {
 
         const url = `https://api.solarstation.in/blogs/getAllBlogs?${solarstationUrlParams.toString()}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          signal: abortController.signal,
+        });
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(
@@ -478,6 +489,10 @@ export default function BlogList(): JSX.Element {
         duration: 1500,
       });
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Fetch aborted');
+        return; // Don't update state if request was aborted
+      }
       console.error("Error fetching blogs:", err);
       setError(err.message || "Failed to load blogs.");
       toast({
@@ -521,22 +536,9 @@ export default function BlogList(): JSX.Element {
 
   // --- Pagination Handlers ---
   const handlePageChange = (page: number) => {
-    // --- DEBUG LOG 2: Page change requested ---
-    //setCurrentPage(page)
-    console.log(
-      "handlePageChange called. Attempting to set page to:",
-      page,
-      "Current totalPages:",
-      totalPages
-    );
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
-      console.log("this is handlechange page", currentPage);
-      fetchBlogs(); // Keeping this call as per "do not change existing logic"
-    } else {
-      console.warn(
-        `Attempted to navigate to invalid page ${page}. Total pages: ${totalPages}`
-      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -906,9 +908,9 @@ export default function BlogList(): JSX.Element {
               <PaginationItem>
                 <PaginationPrevious
                   onClick={() => handlePageChange(currentPage - 1)}
-                  aria-disabled={currentPage === 1}
+                  aria-disabled={currentPage <= 1}
                   className={
-                    currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    currentPage <= 1 ? "pointer-events-none opacity-50" : ""
                   }
                 />
               </PaginationItem>
@@ -933,9 +935,9 @@ export default function BlogList(): JSX.Element {
               <PaginationItem>
                 <PaginationNext
                   onClick={() => handlePageChange(currentPage + 1)}
-                  aria-disabled={currentPage === totalPages}
+                  aria-disabled={currentPage >= totalPages}
                   className={
-                    currentPage === totalPages
+                    currentPage >= totalPages
                       ? "pointer-events-none opacity-50"
                       : ""
                   }

@@ -121,34 +121,15 @@ export default function ViewBlogModal({ blog, isOpen, onClose }: ViewBlogModalPr
               </div> */}
 
             <div className="flex flex-wrap gap-2 pl-7">
-              {/* Determine the tags source: an array or a comma-separated string */}
-              {(() => {
-                let tagsToDisplay: string[] = [];
-
-                if (Array.isArray(blog.tags) && blog.tags.length > 0) {
-                  // Case 1: blog.tags is already a non-empty array
-                  // Use 'as string[]' if blog.tags is typed as 'any' or 'unknown'
-                  tagsToDisplay = blog.tags as string[];
-                } else if (typeof blog.tags === 'string' && blog.tags.trim() !== '') {
-                  // Case 2: blog.tags is a non-empty string.
-                  tagsToDisplay = blog.tags
-                    .split(',') // Split only works on a string
-                    // Explicitly cast 'tag' to 'string' here to satisfy the compiler
-                    .map((tag: string) => tag.trim())
-                    .filter((tag: string) => tag.length > 0);
-                }
-
-                // Render the tags or the 'No tags available' message
-                if (tagsToDisplay.length > 0) {
-                  return tagsToDisplay.map((tag, index) => (
-                    <Badge key={index} className="bg-purple-100 text-purple-800 text-sm py-1 px-3">
-                      {tag}
-                    </Badge>
-                  ));
-                } else {
-                  return <span className="text-gray-500">No tags available</span>;
-                }
-              })()}
+              {Array.isArray(blog.tags) && blog.tags.length > 0 ? (
+                blog.tags.map((tag, index) => (
+                  <Badge key={index} className="bg-purple-100 text-purple-800 text-sm py-1 px-3">
+                    {tag}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-gray-500">No tags available</span>
+              )}
             </div>
           </div>
 

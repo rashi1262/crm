@@ -1,5 +1,4 @@
-// src/pages/Blog.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BlogPost } from '../types';
 import { SolarStationApiResponse } from '../types/solarstation'; // <--- CORRECTED IMPORT
 import { useToast } from "@/components/ui/use-toast";
@@ -26,6 +25,7 @@ export default function Blog(): JSX.Element {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentLimit, setCurrentLimit] = useState<number>(10);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -47,6 +47,13 @@ export default function Blog(): JSX.Element {
   }, [currentPage, currentLimit]);
 
   const fetchBlogs = async () => {
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setLoading(true);
     setError(null);
     try {
@@ -57,6 +64,7 @@ export default function Blog(): JSX.Element {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: abortController.signal,
       });
 
       if (!response.ok) {
@@ -66,8 +74,8 @@ export default function Blog(): JSX.Element {
 
       const result: SolarStationApiResponse = await response.json();
       console.log("SolarStation API Raw Result:", result); // <--- ADD THIS LINE
-console.log("SolarStation API Pagination Object:", result.pagination); // <--- ADD THIS LINE
-console.log("SolarStation API Data Array Length:", result.data ? result.data.length : 0); 
+      console.log("SolarStation API Pagination Object:", result.pagination); // <--- ADD THIS LINE
+      console.log("SolarStation API Data Array Length:", result.data ? result.data.length : 0);
 
       if (!result.data || !Array.isArray(result.data)) {
         throw new Error("API response does not contain a valid 'data' array.");
@@ -100,27 +108,28 @@ console.log("SolarStation API Data Array Length:", result.data ? result.data.len
         technology: undefined, // SolarStation API does not seem to have technology in this response
         url: blog.slug ? `/blog/${blog.slug}` : undefined, // Construct URL if slug exists
       }));
-
+      console.log("transformedBlogs", transformedBlogs)
 
       setBlogs(transformedBlogs);
+      console.log("blogs", blogs)
 
       // --- START OF ROBUST PAGINATION LOGIC FOR SOLARSTATION.IN IN BLOG.TSX ---
       let calculatedTotalPages = 1;
       // Prioritize API's pagination data if available and valid
       if (result.pagination && typeof result.pagination.totalPages === 'number') {
-          calculatedTotalPages = result.pagination.totalPages;
-          console.log("SolarStation API Pagination Response (from object in Blog.tsx):", result.pagination);
+        calculatedTotalPages = result.pagination.totalPages;
+        console.log("SolarStation API Pagination Response (from object in Blog.tsx):", result.pagination);
       } else {
-          // Client-side heuristic if API doesn't provide totalPages or if the object is missing/malformed
-          if (transformedBlogs.length === currentLimit) {
-              calculatedTotalPages = currentPage + 1;
-          } else {
-              calculatedTotalPages = currentPage;
-          }
-          if (currentPage === 1 && transformedBlogs.length === 0) {
-              calculatedTotalPages = 1; // If first page is empty, there's only 1 page
-          }
-          console.log("SolarStation Client-Side Total Pages Calculation (fallback in Blog.tsx):", calculatedTotalPages);
+        // Client-side heuristic if API doesn't provide totalPages or if the object is missing/malformed
+        if (transformedBlogs.length === currentLimit) {
+          calculatedTotalPages = currentPage + 1;
+        } else {
+          calculatedTotalPages = currentPage;
+        }
+        if (currentPage === 1 && transformedBlogs.length === 0) {
+          calculatedTotalPages = 1; // If first page is empty, there's only 1 page
+        }
+        console.log("SolarStation Client-Side Total Pages Calculation (fallback in Blog.tsx):", calculatedTotalPages);
       }
       setTotalPages(calculatedTotalPages);
       // --- END OF ROBUST PAGINATION LOGIC FOR SOLARSTATION.IN IN BLOG.TSX ---
@@ -133,6 +142,10 @@ console.log("SolarStation API Data Array Length:", result.data ? result.data.len
       });
 
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        process.env.NODE_ENV === 'development' && console.log('Fetch aborted');
+        return;
+      }
       console.error("Error fetching blogs:", err);
       setError(err.message || "Failed to load blogs.");
       toast({
@@ -151,6 +164,7 @@ console.log("SolarStation API Data Array Length:", result.data ? result.data.len
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -244,9 +258,9 @@ console.log("SolarStation API Data Array Length:", result.data ? result.data.len
                 <PaginationPrevious
                   onClick={() => handlePageChange(currentPage - 1)}
                   // REMOVE 'disabled' PROP AND REPLACE WITH ARIA AND TABINDEX
-                  aria-disabled={currentPage === 1} // <--- CORRECTED
-                  tabIndex={currentPage === 1 ? -1 : undefined} // <--- CORRECTED
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                  aria-disabled={currentPage <= 1} // <--- CORRECTED
+                  tabIndex={currentPage <= 1 ? -1 : undefined} // <--- CORRECTED
+                  className={currentPage <= 1 ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
               {getPaginationItems().map((item, index) => (
@@ -272,9 +286,9 @@ console.log("SolarStation API Data Array Length:", result.data ? result.data.len
                 <PaginationNext
                   onClick={() => handlePageChange(currentPage + 1)}
                   // REMOVE 'disabled' PROP AND REPLACE WITH ARIA AND TABINDEX
-                  aria-disabled={currentPage === totalPages} // <--- CORRECTED
-                  tabIndex={currentPage === totalPages ? -1 : undefined} // <--- CORRECTED
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                  aria-disabled={currentPage >= totalPages} // <--- CORRECTED
+                  tabIndex={currentPage >= totalPages ? -1 : undefined} // <--- CORRECTED
+                  className={currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
             </PaginationContent>
@@ -336,51 +350,51 @@ console.log("SolarStation API Data Array Length:", result.data ? result.data.len
                 </p>
 
                 {/* Displaying Tags */}
-                {blog.tags && blog.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        <Tag className="h-4 w-4 text-gray-500 mt-1" />
-                        {blog.tags.map((tag, index) => (
-                            <span
-                                key={index}
-                                className="inline-block bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full"
-                            >
-                                {tag}
-                            </span>
-                        ))}
-                    </div>
+                {Array.isArray(blog.tags) && blog.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Tag className="h-4 w-4 text-gray-500 mt-1" />
+                    {blog.tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="inline-block bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 )}
 
                 {/* Displaying Meta Title (Optional, for debugging/admin view) */}
                 {blog.metaTitle && (
-                    <p className="text-gray-500 text-xs mb-1 flex items-center gap-1">
-                        <Info className="h-3 w-3" /> Meta Title: {blog.metaTitle}
-                    </p>
+                  <p className="text-gray-500 text-xs mb-1 flex items-center gap-1">
+                    <Info className="h-3 w-3" /> Meta Title: {blog.metaTitle}
+                  </p>
                 )}
 
                 {/* Displaying Meta Description (Optional) */}
                 {blog.metaDescription && (
-                    <p className="text-gray-500 text-xs mb-1 flex items-center gap-1">
-                        <Info className="h-3 w-3" /> Meta Desc: {blog.metaDescription.substring(0, 70)}...
-                    </p>
+                  <p className="text-gray-500 text-xs mb-1 flex items-center gap-1">
+                    <Info className="h-3 w-3" /> Meta Desc: {blog.metaDescription.substring(0, 70)}...
+                  </p>
                 )}
 
                 {/* Displaying Keywords (Optional) */}
                 {blog.keywords && (
-                    <p className="text-gray-500 text-xs mb-4 flex items-center gap-1">
-                        <Hash className="h-3 w-3" /> Keywords: {blog.keywords.substring(0, 70)}...
-                    </p>
+                  <p className="text-gray-500 text-xs mb-4 flex items-center gap-1">
+                    <Hash className="h-3 w-3" /> Keywords: {blog.keywords.substring(0, 70)}...
+                  </p>
                 )}
 
                 <Button
                   variant="link"
                   className="text-blue-600 hover:text-blue-800 self-start p-0 h-auto"
                   onClick={() => {
-                      console.log('View blog:', blog.slug);
-                      toast({
-                        title: "Read More Clicked",
-                        description: `You clicked to read more about "${blog.title}".`,
-                        duration: 2000,
-                      });
+                    console.log('View blog:', blog.slug);
+                    toast({
+                      title: "Read More Clicked",
+                      description: `You clicked to read more about "${blog.title}".`,
+                      duration: 2000,
+                    });
                   }}
                 >
                   Read More &rarr;
